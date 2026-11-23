@@ -1,0 +1,45 @@
+[
+  {
+    "ownerName": "Sample Owner One",
+    "ownerPhone": "0750 000 0001",
+    "storeName": "Furn Al-Noor",
+    "address": "Malta, near the main roundabout",
+    "city": "duhok",
+    "deliveryFee": 1000,
+    "isActive": true,
+    "products": [
+      { "ku": "سەموونا تەنوورێ", "ar": "صمون حجري", "en": "Stone-oven Samoun", "price": 250 },
+      { "ku": "نانێ تیری", "ar": "خبز تنور", "en": "Tandoor bread", "price": 500 },
+      { "ku": "کولێرە", "ar": "كليچة بالتمر", "en": "Date Klecha", "price": 1500 },
+      { "ku": "کێکا تەڕ", "ar": "كيك إسفنجي", "en": "Sponge cake", "price": 3000 },
+      { "ku": "پیزایا بچووک", "ar": "بيتزا صغيرة", "en": "Mini pizza", "price": 1000 }
+    ]
+  },
+  {
+    "ownerName": "Sample Owner Two",
+    "ownerPhone": "0750 000 0002",
+    "storeName": "Duhok Golden Bakery",
+    "address": "Nakhoshkhana Street, opposite the pharmacy",
+    "city": "duhok",
+    "deliveryFee": 0,
+    "isActive": true,
+    "products": [
+      { "ku": "سەموون", "ar": "صمون", "en": "Samoun", "price": 250 },
+      { "ku": "کرواسۆن", "ar": "كرواسون", "en": "Croissant", "price": 750 },
+      { "ku": "کاهی", "ar": "كاهي", "en": "Kahi pastry", "price": 1000 }
+    ]
+  },
+  {
+    "ownerName": "Sample Owner Three",
+    "ownerPhone": "0750 000 0003",
+    "storeName": "Sharya Fresh Bread",
+    "address": "Sharya centre, next to the market",
+    "city": "sharya",
+    "deliveryFee": 500,
+    "isActive": false,
+    "products": [
+      { "ku": "سەموون", "ar": "صمون", "en": "Samoun", "price": 250 },
+      { "ku": "نانێ تیری", "ar": "خبز تنور", "en": "Tandoor bread", "price": 500 }
+    ]
+  }
+]

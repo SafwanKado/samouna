@@ -1,0 +1,23 @@
+{
+  "name": "@samouna/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch --env-file-if-exists=../.env src/index.js",
+    "migrate": "node --env-file-if-exists=../.env src/migrate.js",
+    "seed": "node --env-file-if-exists=../.env scripts/seed.js",
+    "onboard": "node --env-file-if-exists=../.env scripts/onboard.js",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@samouna/shared": "1.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  }
+}

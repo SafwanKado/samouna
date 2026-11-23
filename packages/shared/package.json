@@ -1,0 +1,24 @@
+{
+  "name": "@samouna/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./phone": "./src/phone.js",
+    "./orders": "./src/orders.js",
+    "./i18n": "./src/i18n.js",
+    "./api": "./src/api.js",
+    "./realtime": "./src/realtime.js",
+    "./react": "./src/react.jsx",
+    "./components": "./src/components.jsx",
+    "./base.css": "./src/base.css"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}

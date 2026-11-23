@@ -1,0 +1,16 @@
+{
+  "name": "samouna",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "server", "apps/*"],
+  "scripts": {
+    "dev:api": "npm -w server run dev",
+    "dev:customer": "npm -w apps/customer run dev",
+    "dev:bakery": "npm -w apps/bakery run dev",
+    "db:migrate": "npm -w server run migrate",
+    "db:seed": "npm -w server run seed",
+    "build": "npm -w apps/customer run build && npm -w apps/bakery run build",
+    "test": "npm -w server test"
+  },
+  "engines": { "node": ">=20" }
+}
