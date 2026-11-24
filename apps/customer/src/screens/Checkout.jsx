@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { errorMessage } from '@samouna/shared/api';
-import { Icon } from '@samouna/shared/components';
+import { Button, Icon, Skeleton, TextField } from '@samouna/shared/components';
 import { formatIraqiMobile } from '@samouna/shared/phone';
 import { useI18n, useStoredState } from '@samouna/shared/react';
 import { api, cartLines, cartSubtotal, newRequestId, normalizeSchedule, scheduledAt, whenLabel } from '../lib.js';
@@ -9,7 +9,7 @@ import { useStore } from './StoreMenu.jsx';
 export default function Checkout(props) {
   const { t } = useI18n();
   if (!props.cart || !props.auth) {
-    return <div className="page empty"><a href="#/cart" className="btn btn-primary">{t('back')}</a></div>;
+    return <div className="page"><a href="#/cart" className="btn">{t('back')}</a></div>;
   }
   return <CheckoutForm {...props} />;
 }
@@ -17,37 +17,39 @@ export default function Checkout(props) {
 function CheckoutForm({ cart, setCart, navigate, notify, auth, delivery }) {
   const { t, money, name, lang } = useI18n();
   const { data } = useStore(cart.storeId, { cart, setCart, notify });
-  const [address, setAddress] = useStoredState('samouna.address', '');
+  const [saved, setSaved] = useStoredState('samouna.address', '');
+  const [address, setAddress] = useState(saved);
   const [notes, setNotes] = useState('');
+  const [showErrors, setShowErrors] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const requestId = useRef(newRequestId());
 
-  if (!data) return <div className="spinner" />;
+  if (!data) return <div className="page"><Skeleton h={30} w="40%" /><div className="stack" style={{ marginTop: 20 }}><Skeleton h={200} r={20} /><Skeleton h={160} r={20} /></div></div>;
   const { store, products } = data;
   const lines = cartLines(cart, products);
   const subtotal = cartSubtotal(lines);
   const total = subtotal + store.deliveryFee;
-  const sched = normalizeSchedule(delivery);
-  const at = scheduledAt(sched);
+  const at = scheduledAt(normalizeSchedule(delivery));
+  const addressOk = address.trim().length >= 5;
 
   async function submit(e) {
     e.preventDefault();
-    if (address.trim().length < 5) return setError(t('err_address_required'));
+    setShowErrors(true);
+    if (!addressOk) return document.getElementById('co-address')?.focus();
     setError('');
     setBusy(true);
     try {
       const { order } = await api.post('/orders', {
         storeId: cart.storeId,
         items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
-        deliveryAddress: address,
-        fullName: auth.user.fullName,
-        notes,
-        scheduledFor: at ? at.toISOString() : undefined,
-        clientRequestId: requestId.current,
+        deliveryAddress: address.trim(), fullName: auth.user.fullName, notes,
+        scheduledFor: at ? at.toISOString() : undefined, clientRequestId: requestId.current,
       });
+      setSaved(address.trim());
       setCart(null);
-      notify(t('orderPlaced'), 'ok');
+      navigator.vibrate?.([15, 40, 15]);
+      notify(t('orderPlaced'), 'success');
       navigate(`/orders/${order.id}`);
     } catch (err) {
       if (err.code === 'product_unavailable') {
@@ -64,49 +66,53 @@ function CheckoutForm({ cart, setCart, navigate, notify, auth, delivery }) {
 
   return (
     <div className="page">
-      <a href="#/cart" className="back-link"><Icon name="back" size={22} flip />{t('back')}</a>
-      <h1>{t('checkout')}</h1>
+      <div className="topbar">
+        <a href="#/cart" className="icon-btn round" aria-label={t('back')}><Icon name="back" flip /></a>
+        <h1 className="screen-title">{t('checkout')}</h1>
+        <span style={{ width: 44 }} />
+      </div>
 
-      <form className="stack" onSubmit={submit} noValidate>
+      <form className="stack checkout" onSubmit={submit} noValidate>
         <section className="card stack">
-          <h3 className="row"><Icon name={at ? 'clock' : 'bolt'} size={20} className="text-accent" />{t('deliveryDetails')}</h3>
-          <p className="muted">{at ? t('scheduledFor', { when: whenLabel(at, lang, t) }) : t('deliverNow')}</p>
-          <label className="field">
-            {t('deliveryAddress')}
-            <span className="hint">{t('addressHint')}</span>
-            <textarea id="co-address" value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" />
-          </label>
-          <label className="field">
-            {t('notes')}
-            <input id="co-notes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={300} />
-          </label>
+          <div className="row-between">
+            <h2 className="card-title"><Icon name={at ? 'clock' : 'bolt'} size={20} className="text-brand" />{t('deliveryDetails')}</h2>
+            <a href="#/cart" className="link-btn small"><Icon name="edit" size={16} />{t('change')}</a>
+          </div>
+          <p className={`when-pill ${at ? 'scheduled' : ''}`}>{at ? t('scheduledFor', { when: whenLabel(at, lang, t) }) : t('deliverNow')}</p>
+          <TextField id="co-address" label={t('deliveryAddress')} hint={t('addressHint')} icon="pin" multiline maxLength={300}
+            value={address} onChange={setAddress} valid={addressOk} error={!addressOk && t('err_address_required')} showErrors={showErrors} autoComplete="street-address" />
+          {saved && saved !== address && (
+            <button type="button" className="chip" onClick={() => setAddress(saved)}><Icon name="repeat" size={16} />{t('lastAddress')}</button>
+          )}
+          <TextField id="co-notes" label={t('notes')} icon="edit" value={notes} onChange={setNotes} maxLength={300} />
         </section>
 
         <section className="card stack">
-          <h3 className="row"><Icon name="user" size={20} className="text-accent" />{t('yourDetails')}</h3>
-          <div className="row-between"><span className="muted">{t('name')}</span><span>{auth.user.fullName}</span></div>
-          <div className="row-between"><span className="muted">{t('phoneNumber')}</span><span className="num">{formatIraqiMobile(auth.user.phone)}</span></div>
+          <h2 className="card-title"><Icon name="user" size={20} className="text-brand" />{t('yourDetails')}</h2>
+          <div className="kv"><span className="muted">{t('name')}</span><span>{auth.user.fullName}</span></div>
+          <div className="kv"><span className="muted">{t('phoneNumber')}</span><span className="num">{formatIraqiMobile(auth.user.phone)}</span></div>
         </section>
 
         <section className="card stack">
-          <h3 className="row"><Icon name="store" size={20} className="text-accent" />{store.name}</h3>
+          <h2 className="card-title"><Icon name="receipt" size={20} className="text-brand" />{store.name}</h2>
           {lines.map((l) => (
-            <div key={l.product.id} className="row-between">
-              <span><span className="num muted">{l.quantity}×</span> {name(l.product)}</span>
+            <div key={l.product.id} className="kv">
+              <span><span className="qty-tag num">{l.quantity}×</span>{name(l.product)}</span>
               <span className="num">{money(l.product.price * l.quantity)}</span>
             </div>
           ))}
-          <hr className="divider" />
-          <div className="row-between muted"><span>{t('subtotal')}</span><span className="num">{money(subtotal)}</span></div>
-          <div className="row-between muted"><span>{t('deliveryFee')}</span><span className="num">{store.deliveryFee ? money(store.deliveryFee) : t('free')}</span></div>
-          <div className="row-between summary-total"><span>{t('total')}</span><span className="num text-price">{money(total)}</span></div>
+          <dl className="totals">
+            <div><dt>{t('subtotal')}</dt><dd className="num">{money(subtotal)}</dd></div>
+            <div><dt>{t('deliveryFee')}</dt><dd className="num">{store.deliveryFee ? money(store.deliveryFee) : t('free')}</dd></div>
+            <div className="grand"><dt>{t('total')}</dt><dd className="num">{money(total)}</dd></div>
+          </dl>
         </section>
 
-        <div className="notice">{t('payCash')}</div>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn btn-primary btn-big" disabled={busy || !lines.length || !store.isActive}>
+        <div className="notice"><Icon name="card" size={18} />{t('payCash')}</div>
+        {error && <div className="form-error" role="alert"><Icon name="alert" size={18} />{error}</div>}
+        <Button type="submit" className="btn-primary btn-lg btn-block" loading={busy} disabled={!lines.length || !store.isActive}>
           {t('placeOrder')} · <span className="num">{money(total)}</span>
-        </button>
+        </Button>
       </form>
     </div>
   );

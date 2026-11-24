@@ -6,17 +6,17 @@
 <style>
   /* Layout: a workbench — a slim instructions strip, then the two devices side by side (stacked with a switcher on phones). */
   :root {
-    --bg: #eef1f4; --panel: #ffffff; --ink: #1c232d; --muted: #5d6877; --line: #d9dee5;
-    --accent: #2f8a17; --accent-ink: #ffffff; --device: #111820; --code-bg: #e3f1dc;
+    --bg: #ece8e1; --panel: #fbfaf7; --ink: #1d1915; --muted: #6f665c; --line: #ddd6cb;
+    --accent: #c9501f; --accent-ink: #ffffff; --device: #1d1915; --code-bg: #fbe7dc;
     --display: 'Rubik', 'Noto Sans Arabic', system-ui, sans-serif;
     --body: 'Noto Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --bg: #151a21; --panel: #1f2630; --ink: #eef1f5; --muted: #9aa5b4; --line: #343e4c;
-    --accent: #5cc93c; --accent-ink: #10150c; --device: #080b0f; --code-bg: #24361d; color-scheme: dark; } }
+    --bg: #0f0e0c; --panel: #1d1b18; --ink: #f4efe8; --muted: #a59b8e; --line: #34302a;
+    --accent: #ee7a45; --accent-ink: #1b1009; --device: #000000; --code-bg: #3a261b; color-scheme: dark; } }
   :root[data-theme="dark"] {
-    --bg: #151a21; --panel: #1f2630; --ink: #eef1f5; --muted: #9aa5b4; --line: #343e4c;
-    --accent: #5cc93c; --accent-ink: #10150c; --device: #080b0f; --code-bg: #24361d; color-scheme: dark; }
+    --bg: #0f0e0c; --panel: #1d1b18; --ink: #f4efe8; --muted: #a59b8e; --line: #34302a;
+    --accent: #ee7a45; --accent-ink: #1b1009; --device: #000000; --code-bg: #3a261b; color-scheme: dark; }
 
   body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
   .wrap { max-width: 1440px; margin: 0 auto; padding-block: 20px 32px;
@@ -45,7 +45,7 @@
   .device-label b { font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
   .device-label span { color: var(--muted); font-size: 0.9rem; direction: ltr; }
   .bezel { background: var(--device); padding: 10px; border-radius: 34px; box-shadow: 0 18px 40px rgb(0 0 0 / 18%); }
-  .bezel iframe { display: block; border: 0; background: #222a36; border-radius: 24px; width: 100%; height: 100%; }
+  .bezel iframe { display: block; border: 0; background: transparent; border-radius: 24px; width: 100%; height: 100%; }
   .phone { flex: 0 0 auto; }
   .phone .bezel { width: 400px; height: 800px; max-width: 100%; }
   .tablet { flex: 1 1 auto; }
@@ -74,8 +74,8 @@
   <ul class="tips">
     <li><strong>Customer account</strong>Tap <em>Register now</em> and use any Iraqi number, for example <code>0751 234 5678</code>. Or tap <em>Browse the app</em> first.</li>
     <li><strong>Bakery login</strong>Use <code>0750 000 0001</code> for Furn Al-Noor or <code>0750 000 0002</code> for Sharya Golden Bakery.</li>
-    <li><strong>WhatsApp code</strong>No message is sent here. The 6-digit code appears in the yellow box under the input.</li>
-    <li><strong>Order sound</strong>Tap anywhere on the tablet once to allow the new-order chime.</li>
+    <li><strong>WhatsApp code</strong>No message is sent here. The 6-digit code appears under the boxes; tap <em>Tap to fill</em>.</li>
+    <li><strong>Light or dark</strong>Both apps follow your device. Switch it in Settings on the phone, or Shop on the tablet.</li>
   </ul>
 
   <div class="switcher" role="tablist" aria-label="Device">

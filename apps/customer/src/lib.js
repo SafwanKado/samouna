@@ -3,7 +3,7 @@ import { createLiveHub, createSessionStore } from '@samouna/shared/react';
 
 const baseUrl = import.meta.env.VITE_API_URL || '';
 
-export const LOGO = '/icons/logo.png';
+export const LOGO = '/icons/icon-192.png';
 export const session = createSessionStore('samouna.customer.session');
 export const live = createLiveHub();
 export const wsUrl = wsUrlFrom(baseUrl);

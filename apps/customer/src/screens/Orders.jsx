@@ -1,25 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { errorMessage } from '@samouna/shared/api';
-import { Icon, useConfirm } from '@samouna/shared/components';
-import { ACTIVE_STATUSES, CUSTOMER_TIMELINE } from '@samouna/shared/orders';
+import { Button, CountdownRing, EmptyState, Icon, Skeleton, useConfirm } from '@samouna/shared/components';
+import { ACTIVE_STATUSES, CANCEL_WINDOW_MS, CUSTOMER_TIMELINE } from '@samouna/shared/orders';
 import { useI18n, useNow } from '@samouna/shared/react';
 import { api, live, whenLabel } from '../lib.js';
+
+const TONE = { completed: 'badge-success', cancelled: 'badge-danger', pending: 'badge-warning' };
 
 export default function Orders({ auth, ...ctx }) {
   const { t } = useI18n();
   if (!auth) {
     return (
       <div className="page">
-        <h2 className="screen-title">{t('ordersTab')}</h2>
-        <div className="cart-empty">
-          <Icon name="bag" size={96} stroke={2} className="cart-empty-icon" />
-          <h2>{t('loginRequired')}</h2>
-          <p className="muted">{t('loginToSeeOrders')}</p>
+        <h1 className="screen-title">{t('ordersTab')}</h1>
+        <EmptyState icon="bag" title={t('loginRequired')} text={t('loginToSeeOrders')}>
           <div className="stack prompt-actions">
-            <a href="#/login/orders" className="btn btn-primary btn-big">{t('login')}</a>
-            <a href="#/register/orders" className="btn btn-outline-accent btn-big">{t('registerNow')}</a>
+            <a href="#/login/orders" className="btn btn-primary btn-lg btn-block">{t('login')}</a>
+            <a href="#/register/orders" className="btn btn-lg btn-block">{t('registerNow')}</a>
           </div>
-        </div>
+        </EmptyState>
       </div>
     );
   }
@@ -51,7 +50,7 @@ function OrderList({ focusId, setCart, navigate, notify }) {
   });
 
   useEffect(() => {
-    if (focusId && orders) document.getElementById(`order-${focusId}`)?.scrollIntoView({ block: 'start' });
+    if (focusId && orders) document.getElementById(`order-${focusId}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [focusId, orders]);
 
   async function orderAgain(order) {
@@ -63,42 +62,42 @@ function OrderList({ focusId, setCart, navigate, notify }) {
       if (byId.get(i.productId)?.isAvailable) items[i.productId] = i.quantity;
       else missing = true;
     }
-    if (missing) notify(t('someUnavailable'));
+    if (missing) notify(t('someUnavailable'), 'danger');
     setCart(Object.keys(items).length ? { storeId: order.storeId, items } : null);
     navigate('/cart');
   }
 
-  if (!orders) return <div className="spinner" />;
+  if (!orders) {
+    return <div className="page"><Skeleton h={30} w="40%" /><div className="stack" style={{ marginTop: 20 }}><Skeleton h={220} r={20} /><Skeleton h={140} r={20} /></div></div>;
+  }
   const active = orders.filter((o) => ACTIVE_STATUSES.includes(o.status));
   const past = orders.filter((o) => !ACTIVE_STATUSES.includes(o.status));
   const update = (next) => setOrders((l) => l.map((x) => (x.id === next.id ? next : x)));
 
   return (
     <div className="page">
-      <h2 className="screen-title">{t('ordersTab')}</h2>
+      <h1 className="screen-title">{t('ordersTab')}</h1>
       {orders.length === 0 && (
-        <div className="cart-empty">
-          <Icon name="bag" size={96} stroke={2} className="cart-empty-icon" />
-          <h2>{t('noOrders')}</h2>
-          <a href="#/" className="btn btn-outline-accent">{t('browseBakeries')}</a>
-        </div>
+        <EmptyState icon="receipt" title={t('noOrders')}>
+          <a href="#/" className="btn btn-primary btn-lg">{t('browseBakeries')}</a>
+        </EmptyState>
       )}
 
-      {active.length > 0 && <h3 className="section-title">{t('activeOrders')}</h3>}
+      {active.length > 0 && <h2 className="section-title">{t('activeOrders')}</h2>}
       <div className="stack">
         {active.map((o) => <ActiveOrder key={o.id} order={o} offset={offset} focused={o.id === focusId} ask={ask} onChange={update} />)}
       </div>
 
-      {past.length > 0 && <h3 className="section-title">{t('orderHistory')}</h3>}
+      {past.length > 0 && <h2 className="section-title">{t('orderHistory')}</h2>}
       <div className="stack">
         {past.map((o) => (
-          <div key={o.id} id={`order-${o.id}`} className={`card order-card ${o.id === focusId ? 'focused' : ''}`}>
+          <article key={o.id} id={`order-${o.id}`} className={`card order-card ${o.id === focusId ? 'focused' : ''}`}>
             <OrderHeader order={o} />
             <OrderItems order={o} />
-            <button className="btn btn-outline-accent btn-big" onClick={() => orderAgain(o).catch(() => notify(t('err_generic'), 'danger'))}>
-              {t('orderAgain')}
-            </button>
-          </div>
+            <Button className="btn-soft btn-block" onClick={() => orderAgain(o).catch(() => notify(t('err_generic'), 'danger'))}>
+              <Icon name="repeat" size={18} />{t('orderAgain')}
+            </Button>
+          </article>
         ))}
       </div>
       {dialog}
@@ -108,21 +107,16 @@ function OrderList({ focusId, setCart, navigate, notify }) {
 
 function OrderHeader({ order }) {
   const { t, money, lang } = useI18n();
-  const tone = { completed: 'badge-ok', cancelled: 'badge-danger', pending: 'badge-warn' }[order.status] || 'badge-brand';
   return (
     <div className="order-head">
       <div className="grow">
         <h3>{order.storeName}</h3>
-        <p className="muted small">
-          {t('order', { id: order.id })} · <span className="num">{new Date(order.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
-        </p>
-        {order.scheduledFor && (
-          <p className="small sched-line"><Icon name="clock" size={16} />{t('scheduledFor', { when: whenLabel(order.scheduledFor, lang, t) })}</p>
-        )}
+        <p className="muted small">{t('order', { id: order.id })} · <span className="num">{new Date(order.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span></p>
+        {order.scheduledFor && <p className="sched-line"><Icon name="clock" size={15} />{t('scheduledFor', { when: whenLabel(order.scheduledFor, lang, t) })}</p>}
       </div>
-      <div className="stack-end">
-        <span className={`badge ${tone}`}>{t(`status_${order.status}`)}</span>
-        <span className="num text-price total-small">{money(order.total)}</span>
+      <div className="order-head-end">
+        <span className={`badge dot ${TONE[order.status] || 'badge-brand'}`}>{t(`status_${order.status}`)}</span>
+        <span className="num order-total">{money(order.total)}</span>
       </div>
     </div>
   );
@@ -132,7 +126,7 @@ function OrderItems({ order }) {
   const { name } = useI18n();
   return (
     <ul className="order-items">
-      {order.items.map((i) => <li key={i.productId}><span className="num muted">{i.quantity}×</span> {name(i)}</li>)}
+      {order.items.map((i) => <li key={i.productId}><span className="qty-tag num">{i.quantity}×</span>{name(i)}</li>)}
     </ul>
   );
 }
@@ -159,39 +153,41 @@ function ActiveOrder({ order, offset, focused, ask, onChange }) {
     }
   }
 
-  const mm = Math.floor(Math.max(0, remaining) / 60000);
-  const ss = String(Math.floor((Math.max(0, remaining) % 60000) / 1000)).padStart(2, '0');
-
   return (
-    <div id={`order-${order.id}`} className={`card order-card ${focused ? 'focused' : ''}`}>
+    <article id={`order-${order.id}`} className={`card order-card active ${focused ? 'focused' : ''}`}>
       <OrderHeader order={order} />
       <Timeline status={order.status} />
       <OrderItems order={order} />
-      <p className="muted small row"><Icon name="pin" size={16} />{order.deliveryAddress}</p>
+      <p className="muted small row"><Icon name="pin" size={15} />{order.deliveryAddress}</p>
       {canCancel ? (
         <div className="cancel-box">
-          <span className="small"><strong>{t('cancelLeft', { time: `${mm}:${ss}` })}</strong></span>
-          <button className="btn btn-danger" disabled={busy} onClick={cancel}>{t('cancelOrder')}</button>
+          <CountdownRing remaining={remaining} total={CANCEL_WINDOW_MS} />
+          <div className="grow"><p className="small muted">{t('cancelEndsIn')}</p></div>
+          <Button className="btn-danger" loading={busy} onClick={cancel}>{t('cancelOrder')}</Button>
         </div>
       ) : (
-        <p className="muted small">{t('cancelLocked')}</p>
+        <p className="locked-note"><Icon name="checkCircle" size={16} />{t('cancelLocked')}</p>
       )}
-      {error && <p className="error" role="alert">{error}</p>}
-    </div>
+      {error && <div className="form-error" role="alert"><Icon name="alert" size={18} />{error}</div>}
+    </article>
   );
 }
 
 function Timeline({ status }) {
   const { t } = useI18n();
   const current = CUSTOMER_TIMELINE.indexOf(status);
+  const pct = Math.max(0, current) / (CUSTOMER_TIMELINE.length - 1);
   return (
-    <ol className="timeline" aria-label={t(`status_${status}`)}>
-      {CUSTOMER_TIMELINE.map((s, i) => (
-        <li key={s} className={i < current ? 'done' : i === current ? 'current' : ''} aria-current={i === current ? 'step' : undefined}>
-          <span className="dot" />
-          <span className="label">{t(`status_${s}`)}</span>
-        </li>
-      ))}
-    </ol>
+    <div className="timeline">
+      <div className="timeline-track" aria-hidden="true"><span style={{ inlineSize: `${pct * 100}%` }} /></div>
+      <ol>
+        {CUSTOMER_TIMELINE.map((s, i) => (
+          <li key={s} className={i < current ? 'done' : i === current ? 'current' : ''} aria-current={i === current ? 'step' : undefined}>
+            <span className="dot">{i < current && <Icon name="check" size={12} stroke={3} />}</span>
+            <span className="label">{t(`status_${s}`)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

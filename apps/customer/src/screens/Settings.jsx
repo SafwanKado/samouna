@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { errorMessage } from '@samouna/shared/api';
-import { Icon, LanguageList, useConfirm } from '@samouna/shared/components';
+import { Button, Icon, LanguageList, TextField, ThemeToggle, useConfirm } from '@samouna/shared/components';
 import { formatIraqiMobile } from '@samouna/shared/phone';
 import { useI18n } from '@samouna/shared/react';
 import { api, session } from '../lib.js';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function Settings({ auth, setGuest, notify, navigate }) {
   const { t } = useI18n();
@@ -19,27 +21,27 @@ export default function Settings({ auth, setGuest, notify, navigate }) {
 
   return (
     <div className="page">
-      <h2 className="screen-title">{t('settingsTab')}</h2>
+      <h1 className="screen-title">{t('settingsTab')}</h1>
 
-      <h3 className="section-title">{t('account')}</h3>
+      <h2 className="section-title">{t('account')}</h2>
       {auth ? <Profile auth={auth} notify={notify} /> : (
         <div className="card stack guest-card">
-          <div className="row"><Icon name="user" size={26} className="text-accent" /><h3>{t('guestTitle')}</h3></div>
-          <p className="muted">{t('guestText')}</p>
-          <a href="#/login/settings" className="btn btn-primary btn-big">{t('login')}</a>
-          <a href="#/register/settings" className="btn btn-outline-accent btn-big">{t('registerNow')}</a>
+          <div className="row"><div className="avatar"><Icon name="user" size={24} /></div><div><h3>{t('guestTitle')}</h3><p className="muted small">{t('guestText')}</p></div></div>
+          <div className="two-col">
+            <a href="#/login/settings" className="btn btn-primary btn-lg">{t('login')}</a>
+            <a href="#/register/settings" className="btn btn-lg">{t('registerNow')}</a>
+          </div>
         </div>
       )}
 
-      <h3 className="section-title">{t('language')}</h3>
+      <h2 className="section-title">{t('theme')}</h2>
+      <ThemeToggle />
+
+      <h2 className="section-title">{t('language')}</h2>
       <LanguageList />
 
-      {auth && (
-        <button type="button" className="btn btn-danger btn-big logout-btn" onClick={logout}>
-          <Icon name="logout" size={22} flip />{t('logout')}
-        </button>
-      )}
-      <p className="muted small about">{t('aboutApp')} · v1.1</p>
+      {auth && <button type="button" className="btn btn-danger btn-lg btn-block logout-btn" onClick={logout}><Icon name="logout" size={20} flip />{t('logout')}</button>}
+      <p className="muted xs about">{t('aboutApp')} · v1.2</p>
       {dialog}
     </div>
   );
@@ -53,16 +55,20 @@ function Profile({ auth, notify }) {
   const [email, setEmail] = useState(user.email || '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const nameOk = name.trim().length >= 2;
+  const emailError = email.trim() && !EMAIL_RE.test(email.trim()) ? t('err_invalid_email') : '';
+  const dirty = name.trim() !== user.fullName || email.trim() !== (user.email || '');
 
   async function save(e) {
     e.preventDefault();
+    if (!nameOk || emailError) return;
     setBusy(true);
     setError('');
     try {
       const r = await api.patch('/auth/me', { fullName: name.trim(), email: email.trim() });
       session.set((s) => ({ ...s, user: r.user }));
       setEditing(false);
-      notify(t('saved'), 'ok');
+      notify(t('saved'), 'success');
     } catch (err) {
       setError(errorMessage(t, err));
     } finally {
@@ -76,19 +82,19 @@ function Profile({ auth, notify }) {
         <div className="avatar" aria-hidden="true">{user.fullName.trim().charAt(0).toUpperCase()}</div>
         <div className="grow">
           <h3>{user.fullName}</h3>
-          <p className="muted num small">{formatIraqiMobile(user.phone)}</p>
+          <p className="muted small num">{formatIraqiMobile(user.phone)}</p>
           {user.email && <p className="muted small profile-email">{user.email}</p>}
         </div>
+        {!editing && <button type="button" className="icon-btn" aria-label={t('editProfile')} onClick={() => setEditing(true)}><Icon name="edit" size={18} /></button>}
       </div>
-      {!editing && <button type="button" className="btn btn-outline-accent profile-edit" onClick={() => setEditing(true)}>{t('editProfile')}</button>}
       {editing && (
-        <form className="stack" onSubmit={save} noValidate>
-          <label className="field">{t('name')}<input id="pf-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>
-          <label className="field">{t('emailOptional')}<input id="pf-email" type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
-          {error && <p className="error" role="alert">{error}</p>}
-          <div className="row">
-            <button type="button" className="btn grow" onClick={() => { setEditing(false); setName(user.fullName); setEmail(user.email || ''); }}>{t('cancel')}</button>
-            <button className="btn btn-primary grow" disabled={busy}>{t('save')}</button>
+        <form className="stack rise" onSubmit={save} noValidate>
+          <TextField id="pf-name" label={t('name')} icon="user" value={name} onChange={setName} valid={nameOk} error={!nameOk && t('err_name_required')} showErrors />
+          <TextField id="pf-email" label={t('emailOptional')} icon="mail" type="email" dir="ltr" value={email} onChange={setEmail} error={emailError} valid={Boolean(email) && !emailError} showErrors />
+          {error && <div className="form-error" role="alert"><Icon name="alert" size={18} />{error}</div>}
+          <div className="two-col">
+            <button type="button" className="btn btn-lg" onClick={() => { setEditing(false); setName(user.fullName); setEmail(user.email || ''); }}>{t('cancel')}</button>
+            <Button type="submit" className="btn-primary btn-lg" loading={busy} disabled={!dirty || !nameOk || Boolean(emailError)}>{t('save')}</Button>
           </div>
         </form>
       )}

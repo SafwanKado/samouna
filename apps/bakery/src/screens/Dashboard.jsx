@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { errorMessage } from '@samouna/shared/api';
-import { Icon, LanguageMenu, OfflineBanner, Switch, Toast, useConfirm } from '@samouna/shared/components';
+import { Button, Icon, LanguageMenu, OfflineBanner, Switch, ThemeToggle, Toast, useConfirm } from '@samouna/shared/components';
 import { ACTIVE_STATUSES } from '@samouna/shared/orders';
 import { useI18n, useNow, useRealtimeConnection, useStoredState } from '@samouna/shared/react';
 import { unlockAudio, useChime, useWakeLock } from '../chime.js';
@@ -11,7 +11,7 @@ const ACTION = {
   pending: { label: 'accept', className: 'btn-primary' },
   in_oven: { label: 'markReady', className: 'btn-primary' },
   ready: { label: 'handToRunner', className: 'btn-primary' },
-  out_for_delivery: { label: 'confirmCash', className: 'btn-ok' },
+  out_for_delivery: { label: 'confirmCash', className: 'btn-success' },
 };
 
 export default function Dashboard({ auth }) {
@@ -58,7 +58,7 @@ export default function Dashboard({ auth }) {
         <div className="dash-top-inner">
           <div className="grow">
             <div className="dash-store">{store.name}</div>
-            <div className={`small ${store.isActive ? 'text-ok' : 'text-danger'}`}>
+            <div className={`small row status-line ${store.isActive ? 'text-success' : 'text-danger'}`}>
               {store.isActive ? t('shopOpen') : t('shopClosed')}
             </div>
           </div>
@@ -85,16 +85,18 @@ export default function Dashboard({ auth }) {
         {tab === 'shop' && <ShopTab store={store} setStore={setStore} onError={(msg) => setToast(msg)} />}
       </main>
 
-      <nav className="tabbar" aria-label="Main">
-        {[['orders', 'bag'], ['menu', 'bread'], ['shop', 'store']].map(([k, icon]) => (
-          <button key={k} className={tab === k ? 'active' : ''} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>
-            <span className="tab-icon">
-              <Icon name={icon} size={26} />
-              {k === 'orders' && pendingCount > 0 && <span className="tab-badge num">{pendingCount}</span>}
-            </span>
-            <span>{t(`${k}Tab`)}</span>
-          </button>
-        ))}
+      <nav className="nav" aria-label="Main">
+        <div className="nav-inner">
+          {[['orders', 'bag'], ['menu', 'bread'], ['shop', 'store']].map(([k, icon]) => (
+            <button key={k} className={tab === k ? 'active' : ''} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>
+              <span className="nav-ico">
+                <Icon name={icon} size={22} />
+                {k === 'orders' && pendingCount > 0 && <span key={pendingCount} className="nav-badge num">{pendingCount}</span>}
+              </span>
+              <span>{t(`${k}Tab`)}</span>
+            </button>
+          ))}
+        </div>
       </nav>
       <Toast message={toast} tone="danger" onDone={() => setToast(null)} />
     </div>
@@ -199,14 +201,14 @@ function Ticket({ order, ask, onUpdate, onError, onDismiss, reload }) {
       </div>
 
       {isCancelled ? (
-        <button className="btn btn-big" onClick={onDismiss}>{t('dismiss')}</button>
+        <button className="btn btn-lg btn-block" onClick={onDismiss}>{t('dismiss')}</button>
       ) : (
         <div className="stack">
-          <button className={`btn btn-big btn-xl ${action.className}`} disabled={busy} onClick={advance}>
+          <Button className={`btn-lg btn-block btn-xl ${action.className}`} loading={busy} onClick={advance}>
             {t(action.label)}
-          </button>
+          </Button>
           {order.status === 'pending' && (
-            <button className="btn-text danger-link" disabled={busy} onClick={reject}>{t('reject')}</button>
+            <button className="link-btn danger-link" disabled={busy} onClick={reject}>{t('reject')}</button>
           )}
         </div>
       )}
@@ -241,7 +243,7 @@ function MenuTab({ onError }) {
             <div className="stock-name">{name(p)}</div>
             <div className="small muted num">{money(p.price)}</div>
           </div>
-          <span className={`badge ${p.isAvailable ? 'badge-ok' : 'badge-muted'}`}>
+          <span className={`badge dot ${p.isAvailable ? 'badge-success' : 'badge-muted'}`}>
             {p.isAvailable ? t('inStock') : t('soldOut')}
           </span>
           <Switch checked={p.isAvailable} label={name(p)} onChange={(v) => toggle(p, v)} />
@@ -313,7 +315,12 @@ function ShopTab({ store, setStore, onError }) {
         </div>
       )}
 
-      <button className="btn btn-big" onClick={() => session.set(null)}>{t('logout')}</button>
+      <div className="card stack">
+        <h3>{t('theme')}</h3>
+        <ThemeToggle />
+      </div>
+
+      <button className="btn btn-danger btn-lg btn-block" onClick={() => session.set(null)}><Icon name="logout" size={20} flip />{t('logout')}</button>
     </div>
   );
 }

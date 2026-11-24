@@ -5,6 +5,29 @@ import { getLanguage, translate, formatIQD, localizedName } from './i18n.js';
 import { connectRealtime } from './realtime.js';
 
 const I18nContext = createContext(null);
+const ThemeContext = createContext({ theme: 'system', setTheme: () => {} });
+
+/**
+ * Appearance: 'system' follows the phone; 'light' / 'dark' pin it.
+ * Sets <html data-theme> and keeps the browser's theme-color in step.
+ */
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useStoredState('samouna.theme', 'system');
+  useEffect(() => {
+    const el = document.documentElement;
+    if (theme === 'light' || theme === 'dark') el.setAttribute('data-theme', theme);
+    else el.removeAttribute('data-theme');
+    const bg = getComputedStyle(document.body || el).getPropertyValue('--bg').trim();
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+      if (theme === 'system') m.setAttribute('content', m.dataset.default || m.getAttribute('content'));
+      else { m.dataset.default ??= m.getAttribute('content'); if (bg) m.setAttribute('content', bg); }
+    });
+  }, [theme]);
+  const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+export const useTheme = () => useContext(ThemeContext);
 const LANG_KEY = 'samouna.lang';
 
 function readLang() {
@@ -77,15 +100,22 @@ export function useStoredState(key, initial) {
       return initial;
     }
   });
-  useEffect(() => {
+  // Persist inside the setter, not in an effect: a component that saves and
+  // then unmounts in the same tick (e.g. checkout -> order page) still saves.
+  const latest = useRef(value);
+  latest.current = value;
+  const set = useCallback((next) => {
+    const v = typeof next === 'function' ? next(latest.current) : next;
+    latest.current = v;
     try {
-      if (value === null || value === undefined) localStorage.removeItem(key);
-      else localStorage.setItem(key, JSON.stringify(value));
+      if (v === null || v === undefined) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(v));
     } catch {
-      /* ignore */
+      /* private mode */
     }
-  }, [key, value]);
-  return [value, setValue];
+    setValue(v);
+  }, [key]);
+  return [value, set];
 }
 
 /**

@@ -25,16 +25,15 @@ async function bundle(app) {
   const js = await readFile(path.join(outDir, 'assets', files.find((f) => f.endsWith('.js'))), 'utf8');
   const css = await readFile(path.join(outDir, 'assets', files.find((f) => f.endsWith('.css'))), 'utf8');
   const icon = (await readFile(path.join(root, 'apps', app, 'public/icons/icon-192.png'))).toString('base64');
-  const logo = (await readFile(path.join(root, 'apps', app, 'public/icons/logo.png'))).toString('base64');
-  return { js, css, icon: `data:image/png;base64,${icon}`, logo: `data:image/png;base64,${logo}` };
+  return { js, css, icon: `data:image/png;base64,${icon}` };
 }
 
-function frameDoc({ js, css, icon, logo }, shim) {
-  const safeJs = js.replaceAll('/icons/icon-192.png', icon).replaceAll('/icons/logo.png', logo).replace(/<\/script/gi, '<\\/script');
-  return `<!doctype html><html lang="ku-Arab" dir="rtl" style="background:#222a36"><head><meta charset="utf-8">
+function frameDoc({ js, css, icon }, shim) {
+  const safeJs = js.replaceAll('/icons/icon-192.png', icon).replace(/<\/script/gi, '<\\/script');
+  return `<!doctype html><html lang="ku-Arab" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>${css}</style></head><body><div id="root"></div>
 <script>${shim}</script><script type="module">${safeJs}</script></body></html>`;
 }

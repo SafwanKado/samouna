@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ConfirmDialog, Icon, useConfirm } from '@samouna/shared/components';
+import { ConfirmDialog, EmptyState, Icon, Segmented, Skeleton, useConfirm } from '@samouna/shared/components';
 import { useI18n, useNow } from '@samouna/shared/react';
 import { cartLines, cartSubtotal, dayLabel, normalizeSchedule, scheduleDays, setCartQty, timeSlots } from '../lib.js';
-import { ProductThumb, QtyControl, useStore } from './StoreMenu.jsx';
+import { ProductThumb, Stepper, useStore } from './StoreMenu.jsx';
 
 export default function Cart({ cart, setCart, notify, auth, navigate, delivery, setDelivery }) {
   const { t, money, name, lang } = useI18n();
@@ -14,17 +14,14 @@ export default function Cart({ cart, setCart, notify, auth, navigate, delivery, 
   if (!cart) {
     return (
       <div className="page">
-        <h2 className="screen-title">{t('shoppingCart')}</h2>
-        <div className="cart-empty">
-          <Icon name="cart" size={120} stroke={2.2} className="cart-empty-icon" />
-          <h2>{t('cartEmpty')}</h2>
-          <p className="muted">{t('cartEmptyHint')}</p>
-          <a href="#/" className="btn btn-outline-accent">{t('browseBakeries')}</a>
-        </div>
+        <h1 className="screen-title">{t('shoppingCart')}</h1>
+        <EmptyState icon="cart" title={t('cartEmpty')} text={t('cartEmptyHint')}>
+          <a href="#/" className="btn btn-primary btn-lg">{t('browseBakeries')}<Icon name="arrowEnd" size={20} flip /></a>
+        </EmptyState>
       </div>
     );
   }
-  if (!data) return <div className="spinner" />;
+  if (!data) return <div className="page"><Skeleton h={30} w="50%" /><div className="stack" style={{ marginTop: 20 }}><Skeleton h={130} r={20} /><Skeleton h={260} r={24} /></div></div>;
 
   const { store, products } = data;
   const lines = cartLines(cart, products);
@@ -33,10 +30,19 @@ export default function Cart({ cart, setCart, notify, auth, navigate, delivery, 
   const sched = normalizeSchedule(delivery);
   const days = scheduleDays();
   const slots = sched.day ? timeSlots(sched.day) : [];
-  const setQty = (id, q) => setCart(setCartQty(cart, cart.storeId, id, q));
+
+  function setQty(p, q) {
+    const before = cart;
+    setCart(setCartQty(cart, cart.storeId, p.id, q));
+    if (q <= 0) notify(t('itemRemoved', { name: name(p) }), 'info', { label: t('undo'), onClick: () => setCart(before) });
+  }
 
   async function clearAll() {
-    if (await ask({ icon: 'clearList', tone: 'danger', title: t('clearCart'), message: t('clearCartConfirm'), confirmLabel: t('clearCart') })) setCart(null);
+    const ok = await ask({ icon: 'trash', tone: 'danger', title: t('clearCart'), message: t('clearCartConfirm'), confirmLabel: t('clearCart') });
+    if (!ok) return;
+    const before = cart;
+    setCart(null);
+    notify(t('clearCart'), 'info', { label: t('undo'), onClick: () => setCart(before) });
   }
 
   function proceed() {
@@ -47,77 +53,74 @@ export default function Cart({ cart, setCart, notify, auth, navigate, delivery, 
   }
 
   return (
-    <div className="page cart-page">
+    <div className="page">
       <div className="row-between">
-        <h2 className="screen-title">{t('shoppingCart')}</h2>
-        <button type="button" className="icon-btn plain" aria-label={t('clearCart')} onClick={clearAll}><Icon name="clearList" size={28} /></button>
+        <h1 className="screen-title">{t('shoppingCart')}</h1>
+        <button type="button" className="icon-btn" aria-label={t('clearCart')} onClick={clearAll}><Icon name="trash" size={20} /></button>
       </div>
-      <p className="muted small cart-from"><Icon name="store" size={16} />{t('from', { store: store.name })}</p>
+      <a href={`#/store/${store.id}`} className="from-store"><Icon name="store" size={16} />{t('from', { store: store.name })}<Icon name="chevronEnd" size={16} flip /></a>
 
-      <div className="stack">
+      <ul className="cart-list">
         {lines.map(({ product: p, quantity }) => (
-          <div key={p.id} className="card cart-item">
+          <li key={p.id} className="card cart-item rise">
             <ProductThumb product={p} size="lg" />
             <div className="grow cart-item-body">
-              <div className="row-between cart-item-head">
+              <div className="row-between">
                 <h3>{name(p)}</h3>
-                <button type="button" className="icon-btn danger" aria-label={`${t('remove')} ${name(p)}`} onClick={() => setQty(p.id, 0)}><Icon name="x" size={20} /></button>
+                <button type="button" className="icon-btn danger" aria-label={`${t('remove')} ${name(p)}`} onClick={() => setQty(p, 0)}><Icon name="x" size={18} /></button>
               </div>
-              <p className="muted">{t('perUnit', { price: money(p.price) })}</p>
-              <QtyControl value={quantity} onChange={(v) => setQty(p.id, v)} />
-              <p className="cart-item-total"><span className="muted">{t('itemTotal')}</span><span className="num text-price">{money(p.price * quantity)}</span></p>
+              <p className="muted small">{t('perUnit', { price: money(p.price) })}</p>
+              <div className="row-between cart-item-foot">
+                <Stepper value={quantity} label={name(p)} onChange={(v) => setQty(p, v)} />
+                <span className="num line-total">{money(p.price * quantity)}</span>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <section className="card summary" aria-label={t('orderSummary')}>
+        <Segmented
+          tone="brand"
+          label={t('deliveryDetails')}
+          value={sched.mode}
+          onChange={(mode) => setDelivery({ ...sched, mode })}
+          options={[{ value: 'now', label: t('orderNow'), icon: 'bolt' }, { value: 'schedule', label: t('scheduleOrder'), icon: 'clock' }]}
+        />
+        {sched.mode === 'schedule' && (
+          <div className="schedule rise">
+            <p className="eyebrow">{t('chooseDay')}</p>
+            <div className="chip-row" role="radiogroup" aria-label={t('chooseDay')}>
+              {days.map((d) => (
+                <button key={d.key} type="button" role="radio" className="chip day-chip" aria-checked={d.key === sched.day}
+                  onClick={() => setDelivery({ ...sched, day: d.key, time: timeSlots(d.key)[0] })}>
+                  {dayLabel(d.date, lang, t)}
+                </button>
+              ))}
+            </div>
+            <p className="eyebrow">{t('chooseTime')}</p>
+            <div className="slot-grid" role="radiogroup" aria-label={t('chooseTime')}>
+              {slots.map((s) => (
+                <button key={s} type="button" role="radio" className="chip slot" aria-checked={s === sched.time} onClick={() => setDelivery({ ...sched, time: s })}>
+                  <span className="num">{s}</span>
+                </button>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
-
-      <section className="summary-card" aria-label={t('orderSummary')}>
-        {store.deliveryFee > 0 && (
-          <div className="row-between muted small"><span>{t('deliveryFee')}</span><span className="num">{money(store.deliveryFee)}</span></div>
         )}
-        <div className="row-between summary-total">
-          <span>{t('total')}</span>
-          <span className="num text-price">{money(total)}</span>
-        </div>
-        <div className="mode-toggle" role="radiogroup" aria-label={t('deliveryDetails')}>
-          <button type="button" role="radio" aria-checked={sched.mode === 'now'} className={sched.mode === 'now' ? 'on' : ''} onClick={() => setDelivery({ ...sched, mode: 'now' })}>
-            <Icon name="bolt" size={20} />{t('orderNow')}
-          </button>
-          <button type="button" role="radio" aria-checked={sched.mode === 'schedule'} className={sched.mode === 'schedule' ? 'on' : ''} onClick={() => setDelivery({ ...sched, mode: 'schedule' })}>
-            <Icon name="clock" size={20} />{t('scheduleOrder')}
-          </button>
-        </div>
-        {sched.mode === 'schedule' && (
-          <div className="schedule-row">
-            <label className="field">
-              {t('deliveryDay')}
-              <select id="sched-day" value={sched.day} onChange={(e) => setDelivery({ ...sched, day: e.target.value, time: timeSlots(e.target.value)[0] })}>
-                {days.map((d) => <option key={d.key} value={d.key}>{dayLabel(d.date, lang, t)}</option>)}
-              </select>
-            </label>
-            <label className="field">
-              {t('deliveryTime')}
-              <select id="sched-time" value={sched.time} onChange={(e) => setDelivery({ ...sched, time: e.target.value })} dir="ltr">
-                {slots.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
-          </div>
-        )}
-        <button type="button" className="btn btn-primary btn-big checkout-btn" disabled={!lines.length || !store.isActive} onClick={proceed}>
-          <Icon name="card" size={24} />{t('proceedToCheckout')}
+        <dl className="totals">
+          <div><dt>{t('subtotal')}</dt><dd className="num">{money(subtotal)}</dd></div>
+          <div><dt>{t('deliveryFee')}</dt><dd className="num">{store.deliveryFee ? money(store.deliveryFee) : t('free')}</dd></div>
+          <div className="grand"><dt>{t('total')}</dt><dd className="num">{money(total)}</dd></div>
+        </dl>
+        <button type="button" className="btn btn-primary btn-lg btn-block" disabled={!lines.length || !store.isActive} onClick={proceed}>
+          {t('proceedToCheckout')}<Icon name="arrowEnd" size={20} flip />
         </button>
         {!store.isActive && <p className="small text-danger">{t('closedNow')}</p>}
       </section>
 
-      <ConfirmDialog
-        open={needLogin}
-        icon="login"
-        title={t('loginRequired')}
-        message={t('loginRequiredText')}
-        confirmLabel={t('login')}
-        onCancel={() => setNeedLogin(false)}
-        onConfirm={() => { setNeedLogin(false); navigate('/login/cart'); }}
-      />
+      <ConfirmDialog open={needLogin} icon="login" title={t('loginRequired')} message={t('loginRequiredText')} confirmLabel={t('login')}
+        onCancel={() => setNeedLogin(false)} onConfirm={() => { setNeedLogin(false); navigate('/login/cart'); }} />
       {confirmDialog}
     </div>
   );

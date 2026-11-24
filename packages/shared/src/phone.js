@@ -43,3 +43,30 @@ export function formatIraqiMobile(input) {
   const local = n.slice(3);
   return `+964 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
 }
+
+/** Digits the user typed for the local part (after +964), without formatting. */
+function localDigits(input) {
+  let d = toAsciiDigits(input ?? '').replace(/\D/g, '');
+  if (d.startsWith('00964')) d = d.slice(5);
+  else if (d.startsWith('964')) d = d.slice(3);
+  return d;
+}
+
+/**
+ * Formats while typing next to a fixed "+964" prefix:
+ * "7501234567" -> "750 123 4567", "07501234567" -> "0750 123 4567".
+ */
+export function formatLocalAsYouType(input) {
+  const d = localDigits(input);
+  const lead = d.startsWith('0') ? 4 : 3;
+  const max = lead + 7;
+  const s = d.slice(0, max);
+  return [s.slice(0, lead), s.slice(lead, lead + 3), s.slice(lead + 3)].filter(Boolean).join(' ');
+}
+
+/** Mobile operator from the prefix: 075 Korek, 077 Asiacell, 078/079 Zain. */
+export function carrierOf(input) {
+  const d = localDigits(input).replace(/^0/, '');
+  if (d.length < 2) return null;
+  return { 75: 'korek', 77: 'asiacell', 78: 'zain', 79: 'zain' }[d.slice(0, 2)] || null;
+}

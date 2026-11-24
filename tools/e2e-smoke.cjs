@@ -11,9 +11,10 @@ async function pickLanguage(page, label) {
 
 async function enterCode(page) {
   const hint = await page.locator('.dev-hint').textContent();
-  await page.locator('.otp-input').fill(hint.match(/\d{6}/)[0]);
+  await page.getByLabel('Digit 1').fill(hint.match(/\d{6}/)[0]); // pastes into all six boxes
 }
 
+let failShots = async () => {};
 (async () => {
   const browser = await chromium.launch();
   const errors = [];
@@ -26,10 +27,11 @@ async function enterCode(page) {
     p.on('dialog', () => errors.push('native dialog shown'));
   }
   const shot = (p, name) => p.screenshot({ path: `${out}/${name}.png` });
+  failShots = async () => { await shot(c, 'FAIL-customer').catch(() => {}); await shot(b, 'FAIL-bakery').catch(() => {}); };
 
   // --- Login screen opens first (default Badini, RTL), switch to English
   await c.goto('http://localhost:5173/');
-  await c.locator('.auth-screen').waitFor();
+  await c.locator('.auth').waitFor();
   assert.equal(await c.evaluate(() => document.documentElement.dir), 'rtl');
   await pickLanguage(c, 'English');
   assert.equal(await c.evaluate(() => document.documentElement.dir), 'ltr');
@@ -37,32 +39,52 @@ async function enterCode(page) {
   await shot(c, '01-login');
 
   // Login with an unknown number is refused with a pointer to Register
-  await c.getByLabel('Phone number').fill('0751 234 5678');
+  await c.getByLabel('Phone number').fill('07512');
+  await c.getByRole('button', { name: 'Login', exact: true }).click();
+  await c.getByText('Please enter a valid Iraqi mobile number.').waitFor(); // inline validation
+  await c.getByLabel('Phone number').fill('07512345678');
+  assert.equal(await c.getByLabel('Phone number').inputValue(), '0751 234 5678'); // formatted as typed
+  await c.locator('.carrier', { hasText: 'Korek' }).waitFor();
+  await shot(c, '01b-login-filled');
   await c.getByRole('button', { name: 'Login', exact: true }).click();
   await c.getByText(/Please register first/).waitFor();
 
   // --- Browse as guest, fill a cart
   await c.getByRole('button', { name: 'Browse the app' }).click();
   await c.getByText('Bakeries in Sharya').waitFor();
+  await c.getByLabel('Search bakeries').fill('golden');
+  await c.locator('.store-card', { hasText: 'Sharya Golden Bakery' }).waitFor();
+  assert.equal(await c.locator('a.store-card').count(), 1);
+  await c.getByLabel('Search bakeries').fill('');
   await shot(c, '02-bakeries');
   await c.getByText('Furn Al-Noor').click();
   await c.locator('.menu-item').first().getByRole('button', { name: /Add/ }).click();
   await c.locator('.menu-item').first().getByRole('button', { name: '+' }).click();
   await c.locator('.menu-item').nth(2).getByRole('button', { name: /Add/ }).click();
+  await c.locator('.menu-item').nth(3).getByRole('button', { name: /Add/ }).click();
   await shot(c, '03-menu');
   await c.getByRole('link', { name: /View cart/ }).click();
   await c.getByText('Shopping Cart', { exact: true }).first().waitFor();
-  assert.equal(await c.locator('.tab-badge').textContent(), '3');
+  assert.equal(await c.locator('.nav-badge').textContent(), '4');
+  // remove an item, then undo
+  await c.getByRole('button', { name: 'Remove Sponge cake' }).click();
+  await c.getByRole('button', { name: 'Undo' }).click();
+  await c.getByRole('heading', { name: 'Sponge cake' }).waitFor();
+  await c.getByRole('button', { name: 'Remove Sponge cake' }).click();
+  assert.equal(await c.locator('.nav-badge').textContent(), '3');
   await shot(c, '04-cart');
 
   // --- Checkout as guest -> Login Required dialog -> Register -> back to cart
   await c.getByRole('button', { name: 'Proceed to Checkout' }).click();
-  await c.getByRole('alertdialog').getByText('Login Required').waitFor();
+  await c.getByRole('alertdialog').getByRole('heading', { name: 'Login Required' }).waitFor();
   await shot(c, '05-login-required');
   await c.getByRole('alertdialog').getByRole('button', { name: 'Login' }).click();
   await c.getByRole('link', { name: 'Register now' }).click();
   await c.getByLabel('Name').fill('Hozan Ali');
   await c.getByLabel('Phone number').fill('0751 234 5678');
+  await c.getByLabel('Email (Optional)').fill('hozan@example');
+  await c.getByRole('button', { name: 'Register now' }).click();
+  await c.getByText('Please enter a valid email address.').waitFor();
   await c.getByLabel('Email (Optional)').fill('hozan@example.com');
   await shot(c, '06-register');
   await c.getByRole('button', { name: 'Register now' }).click();
@@ -71,11 +93,13 @@ async function enterCode(page) {
 
   // --- Schedule the order
   await c.getByRole('radio', { name: 'Schedule Order' }).click();
-  await c.locator('#sched-day').selectOption({ index: 1 });
-  await c.locator('#sched-time').selectOption('09:30');
+  await c.getByRole('radio', { name: 'Tomorrow' }).click();
+  await c.getByRole('radio', { name: '09:30' }).click();
   await shot(c, '07-cart-schedule');
   await c.getByRole('button', { name: 'Proceed to Checkout' }).click();
   await c.getByText(/Scheduled for Tomorrow · 09:30/).waitFor();
+  await c.getByRole('button', { name: /Place order/ }).click();
+  await c.getByText('Please enter your delivery address.').waitFor(); // validation before submit
   await c.locator('#co-address').fill('Sharya, street 4, next to the green pharmacy');
   await shot(c, '08-checkout');
   await c.getByRole('button', { name: /Place order/ }).click();
@@ -105,6 +129,8 @@ async function enterCode(page) {
 
   // --- Second order, Order Now, cancelled within 5 min via in-app dialog
   await c.locator('.menu-item').nth(1).getByRole('button', { name: /Add/ }).click();
+  await c.getByLabel('Search the menu').fill('tandoor');
+  assert.equal(await c.locator('.menu-item').count(), 1);
   await c.getByRole('link', { name: /View cart/ }).click();
   await c.getByRole('radio', { name: 'Order Now' }).click();
   await c.getByRole('button', { name: 'Proceed to Checkout' }).click();
@@ -116,12 +142,15 @@ async function enterCode(page) {
   await shot(b, '11-bakery-cancelled');
 
   // --- Empty cart + settings + Arabic RTL
-  await c.getByRole('link', { name: 'Shopping Cart' }).click();
+  await c.getByRole('link', { name: 'Shopping Cart', exact: true }).click();
   await c.getByText('Your Cart is Empty').waitFor();
   await shot(c, '12-cart-empty');
   await c.getByRole('link', { name: 'Settings' }).click();
   await c.getByText('hozan@example.com').waitFor();
   await shot(c, '13-settings');
+  await c.getByRole('radio', { name: 'Dark' }).click();
+  assert.equal(await c.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  await shot(c, '13b-settings-dark');
   await c.getByRole('radio', { name: 'العربية' }).click();
   assert.equal(await c.evaluate(() => document.documentElement.dir), 'rtl');
   await c.getByText('الإعدادات').first().waitFor();
@@ -130,4 +159,4 @@ async function enterCode(page) {
   assert.deepEqual(errors, [], 'no page errors or native dialogs');
   await browser.close();
   console.log('E2E passed');
-})().catch((e) => { console.error(e); process.exit(1); });
+})().catch(async (e) => { console.error(e); await failShots(); process.exit(1); });
