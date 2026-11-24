@@ -31,14 +31,15 @@ export async function onboard(pool, bakeries) {
       );
       for (const [i, p] of (b.products || []).entries()) {
         const { rowCount } = await db.query(
-          'UPDATE products SET name_ku = $3, name_ar = $4, price = $5, sort_order = $6 WHERE store_id = $1 AND name_en = $2',
-          [store.store_id, p.en, p.ku, p.ar, p.price, i],
+          `UPDATE products SET name_ku = $3, name_ar = $4, price = $5, sort_order = $6, image_url = $7
+            WHERE store_id = $1 AND name_en = $2`,
+          [store.store_id, p.en, p.ku, p.ar, p.price, i, p.imageUrl ?? null],
         );
         if (!rowCount) {
           await db.query(
-            `INSERT INTO products (store_id, name_ku, name_ar, name_en, price, sort_order)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [store.store_id, p.ku, p.ar, p.en, p.price, i],
+            `INSERT INTO products (store_id, name_ku, name_ar, name_en, price, sort_order, image_url)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [store.store_id, p.ku, p.ar, p.en, p.price, i, p.imageUrl ?? null],
           );
         }
       }

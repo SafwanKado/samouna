@@ -4,7 +4,7 @@ export const ORDER_COLUMNS = `
   o.order_id, o.customer_id, o.store_id, o.customer_name, o.customer_phone,
   o.delivery_address, o.delivery_city, o.notes, o.subtotal_amount, o.delivery_fee,
   o.total_amount, o.status, o.cancellation_reason, o.cancelled_by, o.created_at,
-  o.accepted_at, o.ready_at, o.out_for_delivery_at, o.completed_at, o.cancelled_at,
+  o.scheduled_for, o.accepted_at, o.ready_at, o.out_for_delivery_at, o.completed_at, o.cancelled_at,
   s.store_name`;
 
 export function serializeUser(u) {
@@ -12,6 +12,7 @@ export function serializeUser(u) {
     id: u.user_id,
     fullName: u.full_name,
     phone: u.phone_number,
+    email: u.email ?? null,
     role: u.role,
     preferredLanguage: u.preferred_language,
   };
@@ -34,6 +35,7 @@ export function serializeProduct(p) {
     storeId: p.store_id,
     name: { ku: p.name_ku, ar: p.name_ar, en: p.name_en },
     price: p.price,
+    imageUrl: p.image_url ?? null,
     isAvailable: p.is_available,
   };
 }
@@ -56,6 +58,7 @@ export function serializeOrder(o, items = []) {
     cancellationReason: o.cancellation_reason,
     cancelledBy: o.cancelled_by,
     createdAt: o.created_at,
+    scheduledFor: o.scheduled_for,
     cancellableUntil: new Date(new Date(o.created_at).getTime() + CANCEL_WINDOW_MS),
     acceptedAt: o.accepted_at,
     readyAt: o.ready_at,

@@ -20,12 +20,12 @@
   }
 
   const BAKERIES = [
-    { owner: 'Sample Owner One', phone: '+9647500000001', name: 'Furn Al-Noor', address: 'Malta, near the main roundabout', city: 'duhok', fee: 1000, open: true,
+    { owner: 'Sample Owner One', phone: '+9647500000001', name: 'Furn Al-Noor', address: 'Sharya main street, near the roundabout', city: 'sharya', fee: 1000, open: true,
       products: [['سەموونا تەنوورێ', 'صمون حجري', 'Stone-oven Samoun', 250], ['نانێ تیری', 'خبز تنور', 'Tandoor bread', 500],
         ['کولێرە', 'كليچة بالتمر', 'Date Klecha', 1500], ['کێکا تەڕ', 'كيك إسفنجي', 'Sponge cake', 3000], ['پیزایا بچووک', 'بيتزا صغيرة', 'Mini pizza', 1000]] },
-    { owner: 'Sample Owner Two', phone: '+9647500000002', name: 'Duhok Golden Bakery', address: 'Nakhoshkhana Street, opposite the pharmacy', city: 'duhok', fee: 0, open: true,
+    { owner: 'Sample Owner Two', phone: '+9647500000002', name: 'Sharya Golden Bakery', address: 'Market street, opposite the pharmacy', city: 'sharya', fee: 0, open: true,
       products: [['سەموون', 'صمون', 'Samoun', 250], ['کرواسۆن', 'كرواسون', 'Croissant', 750], ['کاهی', 'كاهي', 'Kahi pastry', 1000]] },
-    { owner: 'Sample Owner Three', phone: '+9647500000003', name: 'Sharya Fresh Bread', address: 'Sharya centre, next to the market', city: 'sharya', fee: 500, open: false,
+    { owner: 'Sample Owner Three', phone: '+9647500000003', name: 'Sharya Fresh Bread', address: 'Sharya centre, next to the market', city: 'sharya', fee: 500, open: true,
       products: [['سەموون', 'صمون', 'Samoun', 250], ['نانێ تیری', 'خبز تنور', 'Tandoor bread', 500]] },
   ];
 
@@ -38,7 +38,7 @@
       const u = { id: seq.user++, fullName: b.owner, phone: b.phone, role: 'bakery_owner', preferredLanguage: 'ku' };
       const s = { id: seq.store++, ownerId: u.id, name: b.name, address: b.address, city: b.city, deliveryFee: b.fee, isActive: b.open };
       db.users.push(u); db.stores.push(s);
-      for (const [ku, ar, en, price] of b.products) db.products.push({ id: seq.product++, storeId: s.id, name: { ku, ar, en }, price, isAvailable: true });
+      for (const [ku, ar, en, price] of b.products) db.products.push({ id: seq.product++, storeId: s.id, name: { ku, ar, en }, price, imageUrl: null, isAvailable: true });
     }
   }
   reset();
@@ -78,6 +78,13 @@
     return { user };
   }
 
+  function parseEmail(input) {
+    const e = String(input ?? '').trim().toLowerCase();
+    if (!e) return null;
+    if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) fail(400, 'invalid_email');
+    return e;
+  }
+
   function requestOtp(meta) {
     const hourAgo = Date.now() - 3600e3;
     const recent = db.otps.filter((o) => o.phone === meta && o.createdAt > hourAgo);
@@ -112,6 +119,16 @@
         return { store: storeJson(s), products: clone(db.products.filter((p) => p.storeId === s.id)) };
       }
       case 'GET /auth/me': return { user: clone(auth(headers).user) };
+      case 'PATCH /auth/me': {
+        const { user } = auth(headers);
+        if (body.fullName !== undefined) {
+          const n = String(body.fullName).trim();
+          if (n.length < 2) fail(400, 'name_required');
+          user.fullName = n;
+        }
+        if (body.email !== undefined) user.email = parseEmail(body.email);
+        return { user: clone(user) };
+      }
       case 'POST /orders': {
         const { user } = auth(headers, 'customer');
         if (body.clientRequestId) {
@@ -128,12 +145,18 @@
         if (bad.length) fail(409, 'product_unavailable', { productIds: bad });
         const name = String(body.fullName || '').trim();
         if (name.length >= 2) user.fullName = name;
+        let scheduledFor = null;
+        if (body.scheduledFor) {
+          const ahead = new Date(body.scheduledFor).getTime() - Date.now();
+          if (Number.isNaN(ahead) || ahead < 20 * 60e3 || ahead > 7 * 86400e3) fail(400, 'schedule_invalid');
+          scheduledFor = new Date(body.scheduledFor).toISOString();
+        }
         const subtotal = items.reduce((t, i) => t + product(i.productId).price * i.quantity, 0);
         const o = {
           id: seq.order++, customerId: user.id, storeId: s.id, clientRequestId: body.clientRequestId || null,
           customerName: user.fullName, customerPhone: user.phone, deliveryAddress: address, deliveryCity: s.city,
           notes: String(body.notes || '').trim() || null, subtotal, deliveryFee: s.deliveryFee, total: subtotal + s.deliveryFee,
-          status: 'pending', cancellationReason: null, cancelledBy: null, createdAt: new Date().toISOString(), updatedAt: Date.now(),
+          scheduledFor, status: 'pending', cancellationReason: null, cancelledBy: null, createdAt: new Date().toISOString(), updatedAt: Date.now(),
           items: items.map((i) => ({ ...i, price: product(i.productId).price })),
         };
         db.orders.push(o);
@@ -223,6 +246,9 @@
       const phone = `+${meta}`;
       const owner = db.users.find((u) => u.phone === phone && u.role === 'bakery_owner');
       if (app === 'bakery' && !owner) fail(403, 'not_bakery');
+      const exists = db.users.some((u) => u.phone === phone);
+      if (app === 'customer' && body.intent === 'login' && !exists) fail(404, 'no_account');
+      if (app === 'customer' && body.intent === 'register' && exists) fail(409, 'account_exists');
       if (c === 'request') return requestOtp(meta);
       if (c === 'verify') {
         if (app === 'bakery') {
@@ -232,12 +258,16 @@
         }
         let user = db.users.find((u) => u.phone === phone);
         const name = String(body.fullName || '').trim();
+        const email = parseEmail(body.email);
         if (!user && name.length < 2) fail(400, 'name_required');
         verifyOtp(meta, body.code);
         if (!user) {
-          user = { id: seq.user++, fullName: name, phone, role: 'customer', preferredLanguage: body.lang || 'ku' };
+          user = { id: seq.user++, fullName: name, phone, email, role: 'customer', preferredLanguage: body.lang || 'ku' };
           db.users.push(user);
-        } else if (name.length >= 2) user.fullName = name;
+        } else {
+          if (name.length >= 2) user.fullName = name;
+          if (email) user.email = email;
+        }
         return { token: `demo.customer.${user.id}`, user: clone(user) };
       }
     }

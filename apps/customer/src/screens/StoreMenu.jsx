@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Icon, useConfirm } from '@samouna/shared/components';
 import { useI18n } from '@samouna/shared/react';
-import { api, cartCount, cartLines, cartSubtotal, live } from '../lib.js';
+import { api, cartCount, cartLines, cartSubtotal, live, setCartQty } from '../lib.js';
 
-/** Loads a store + products and keeps them live. Shared with Checkout. */
+/** Loads a store + products and keeps them live. Shared with Cart and Checkout. */
 export function useStore(storeId, { cart, setCart, notify }) {
   const { t } = useI18n();
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
 
   const load = useCallback(() => {
+    if (!storeId) return;
     api.get(`/stores/${storeId}`).then(setData).catch(() => setError(true));
   }, [storeId]);
   useEffect(load, [load]);
@@ -21,7 +23,7 @@ export function useStore(storeId, { cart, setCart, notify }) {
     }
   });
 
-  // Drop items from the basket the moment the bakery marks them sold out.
+  // Drop items from the cart the moment the bakery marks them sold out.
   useEffect(() => {
     if (!data || !cart || cart.storeId !== storeId) return;
     const gone = data.products.filter((p) => !p.isAvailable && cart.items[p.id]);
@@ -35,24 +37,41 @@ export function useStore(storeId, { cart, setCart, notify }) {
   return { data, error };
 }
 
-export default function StoreMenu({ storeId, cart, setCart, navigate, notify }) {
+export function ProductThumb({ product, size = 'md' }) {
+  return (
+    <div className={`thumb thumb-${size}`} aria-hidden="true">
+      {product.imageUrl ? <img src={product.imageUrl} alt="" loading="lazy" /> : <Icon name="bread" size={size === 'lg' ? 44 : 34} stroke={1.6} />}
+    </div>
+  );
+}
+
+export function QtyControl({ value, onChange, max = 99, disabledPlus }) {
+  return (
+    <div className="qty">
+      <button type="button" className="icon-btn" aria-label="−" onClick={() => onChange(value - 1)}><Icon name="minus" /></button>
+      <span className="qty-value num" aria-live="polite">{value}</span>
+      <button type="button" className="icon-btn" aria-label="+" disabled={disabledPlus || value >= max} onClick={() => onChange(value + 1)}><Icon name="plus" /></button>
+    </div>
+  );
+}
+
+export default function StoreMenu({ storeId, cart, setCart, notify }) {
   const { t, money, name } = useI18n();
   const { data, error } = useStore(storeId, { cart, setCart, notify });
+  const [ask, dialog] = useConfirm();
 
   if (error) return <p className="empty">{t('err_generic')}</p>;
   if (!data) return <div className="spinner" />;
   const { store, products } = data;
   const myCart = cart?.storeId === storeId ? cart : null;
 
-  function setQty(productId, qty) {
+  async function setQty(productId, qty) {
     if (cart && cart.storeId !== storeId && cartCount(cart) > 0) {
-      if (!window.confirm(t('replaceCart'))) return;
-      cart = null;
+      const ok = await ask({ icon: 'cart', title: t('replaceCartTitle'), message: t('replaceCart'), confirmLabel: t('yes'), cancelLabel: t('no') });
+      if (!ok) return;
+      return setCart(setCartQty(null, storeId, productId, qty));
     }
-    const items = { ...(cart?.storeId === storeId ? cart.items : {}) };
-    if (qty <= 0) delete items[productId];
-    else items[productId] = Math.min(99, qty);
-    setCart(Object.keys(items).length ? { storeId, items } : null);
+    setCart(setCartQty(cart, storeId, productId, qty));
   }
 
   const lines = cartLines(myCart, products);
@@ -60,11 +79,15 @@ export default function StoreMenu({ storeId, cart, setCart, navigate, notify }) 
 
   return (
     <div className="page">
-      <a href="#/" className="btn-link">‹ {t('back')}</a>
-      <div className="store-header">
+      <a href="#/" className="back-link"><Icon name="back" size={22} flip />{t('back')}</a>
+      <header className="store-header">
         <h1>{store.name}</h1>
-        <p className="muted">{store.address}</p>
-      </div>
+        <p className="muted row"><Icon name="pin" size={16} />{store.address}</p>
+        <div className="row">
+          <span className={`badge ${store.isActive ? 'badge-ok' : 'badge-muted'}`}>{store.isActive ? t('open') : t('closed')}</span>
+          <span className="badge badge-muted">{t('deliveryFee')}: {store.deliveryFee ? money(store.deliveryFee) : t('free')}</span>
+        </div>
+      </header>
       {!store.isActive && <div className="notice notice-warn">{t('closedNow')}</div>}
 
       <ul className="menu">
@@ -72,21 +95,18 @@ export default function StoreMenu({ storeId, cart, setCart, navigate, notify }) 
           const qty = myCart?.items[p.id] || 0;
           const disabled = !p.isAvailable || !store.isActive;
           return (
-            <li key={p.id} className={`menu-item ${p.isAvailable ? '' : 'sold-out'}`}>
+            <li key={p.id} className={`card menu-item ${p.isAvailable ? '' : 'sold-out'}`}>
+              <ProductThumb product={p} />
               <div className="grow">
                 <div className="menu-name">{name(p)}</div>
                 <div className="menu-price num">{money(p.price)}</div>
                 {!p.isAvailable && <span className="badge badge-muted">{t('soldOut')}</span>}
               </div>
               {qty > 0 ? (
-                <div className="qty">
-                  <button className="icon-btn" aria-label="−" onClick={() => setQty(p.id, qty - 1)}>−</button>
-                  <span className="qty-value num" aria-live="polite">{qty}</span>
-                  <button className="icon-btn" aria-label="+" disabled={disabled} onClick={() => setQty(p.id, qty + 1)}>+</button>
-                </div>
+                <QtyControl value={qty} disabledPlus={disabled} onChange={(v) => setQty(p.id, v)} />
               ) : (
-                <button className="btn btn-add" disabled={disabled} onClick={() => setQty(p.id, 1)}>
-                  + {t('add')}
+                <button className="btn btn-primary btn-add" disabled={disabled} onClick={() => setQty(p.id, 1)}>
+                  <Icon name="plus" size={18} />{t('add')}
                 </button>
               )}
             </li>
@@ -95,18 +115,13 @@ export default function StoreMenu({ storeId, cart, setCart, navigate, notify }) 
       </ul>
 
       {count > 0 && (
-        <div className="cart-bar">
-          <div className="cart-bar-inner">
-            <div>
-              <div className="small muted">{t('items', { n: count })}</div>
-              <div className="cart-total num">{money(cartSubtotal(lines))}</div>
-            </div>
-            <button className="btn btn-primary" disabled={!store.isActive} onClick={() => navigate('/checkout')}>
-              {t('proceedToCheckout')}
-            </button>
-          </div>
-        </div>
+        <a href="#/cart" className="cart-float">
+          <span className="cart-float-count num">{count}</span>
+          <span className="grow">{t('viewCart')}</span>
+          <span className="num">{money(cartSubtotal(lines))}</span>
+        </a>
       )}
+      {dialog}
     </div>
   );
 }

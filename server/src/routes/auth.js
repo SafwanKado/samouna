@@ -28,6 +28,29 @@ function ipLimiter({ max, windowMs }) {
   };
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Optional email: blank -> null, otherwise must look like an address. */
+function parseEmail(input) {
+  const email = String(input ?? '').trim().toLowerCase();
+  if (!email) return null;
+  if (email.length > 254 || !EMAIL_RE.test(email)) throw badRequest('invalid_email');
+  return email;
+}
+
+/**
+ * Customer app has separate Login and Register screens.
+ * login    -> the number must already have an account
+ * register -> the number must not have one yet
+ * (no intent keeps the older "log in or create" behaviour)
+ */
+async function checkIntent(db, e164, intent) {
+  if (intent !== 'login' && intent !== 'register') return;
+  const exists = (await db.query('SELECT 1 FROM users WHERE phone_number = $1', [e164])).rowCount > 0;
+  if (intent === 'login' && !exists) throw new HttpError(404, 'no_account', 'No account for this number');
+  if (intent === 'register' && exists) throw new HttpError(409, 'account_exists', 'Number already registered');
+}
+
 function parsePhone(input) {
   const meta = normalizeIraqiMobile(input);
   if (!meta) throw badRequest('invalid_phone');
@@ -55,6 +78,7 @@ export function authRoutes(pool, { otpOptions } = {}) {
     if (app === 'bakery' && !(await findBakeryOwner(pool, toE164(phone)))) {
       throw new HttpError(403, 'not_bakery', 'Not a registered bakery number');
     }
+    if (app === 'customer') await checkIntent(pool, toE164(phone), req.body.intent);
 
     const result = await requestOtp(pool, phone, lang, otpOptions);
     res.json({ sent: true, phone: toE164(phone), ...result });
@@ -79,18 +103,21 @@ export function authRoutes(pool, { otpOptions } = {}) {
       });
     }
 
+    // All input checks run before the code is consumed, so the user can fix and retry.
+    const email = parseEmail(req.body.email);
+    await checkIntent(pool, e164, req.body.intent);
     const existing = (await pool.query('SELECT * FROM users WHERE phone_number = $1', [e164])).rows[0];
-    // Check before consuming the code so the user can add their name and retry.
     if (!existing && fullName.length < 2) throw badRequest('name_required');
     await verifyOtp(pool, phone, req.body.code);
 
     const { rows } = await pool.query(
-      `INSERT INTO users (full_name, phone_number, preferred_language)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (full_name, phone_number, preferred_language, email)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (phone_number) DO UPDATE
-         SET full_name = CASE WHEN length($1) >= 2 THEN $1 ELSE users.full_name END
+         SET full_name = CASE WHEN length($1) >= 2 THEN $1 ELSE users.full_name END,
+             email = COALESCE($4, users.email)
        RETURNING *`,
-      [fullName, e164, lang],
+      [fullName, e164, lang, email],
     );
     const user = rows[0];
     res.json({ token: signToken({ userId: user.user_id, role: user.role, app }), user: serializeUser(user) });
@@ -106,10 +133,14 @@ export function authRoutes(pool, { otpOptions } = {}) {
     const fullName = req.body.fullName === undefined ? null : String(req.body.fullName).trim().slice(0, 100);
     const lang = LANGS.includes(req.body.preferredLanguage) ? req.body.preferredLanguage : null;
     if (fullName !== null && fullName.length < 2) throw badRequest('name_required');
+    // email: undefined = keep, "" = remove, otherwise validate
+    const emailGiven = req.body.email !== undefined;
+    const email = emailGiven ? parseEmail(req.body.email) : null;
     const { rows } = await pool.query(
-      `UPDATE users SET full_name = COALESCE($2, full_name), preferred_language = COALESCE($3, preferred_language)
+      `UPDATE users SET full_name = COALESCE($2, full_name), preferred_language = COALESCE($3, preferred_language),
+              email = CASE WHEN $4 THEN $5 ELSE email END
         WHERE user_id = $1 RETURNING *`,
-      [req.user.id, fullName, lang],
+      [req.user.id, fullName, lang, emailGiven, email],
     );
     res.json({ user: serializeUser(rows[0]) });
   }));

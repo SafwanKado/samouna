@@ -1,6 +1,9 @@
 # Samouna
 
-Bread and pastry delivery for bakeries in Duhok and Sharya. There are two installable PWAs and one API behind them.
+Bread and pastry delivery for bakeries in Sharya. There are two installable PWAs and one API behind them.
+Duhok is switched off for now: it is still allowed in the database, so serving it again means adding it to `CITIES` in `packages/shared/src/orders.js`.
+
+**Customer app:** login and register with a WhatsApp code (name, phone, optional email), or browse as a guest. Four tabs: Bakeries, Shopping Cart, Orders and Settings. Checkout asks guests to log in. Orders can be delivered now or scheduled 30 minutes to 6 days ahead.
 
 | Part | Path | Production URL |
 |---|---|---|
@@ -16,7 +19,7 @@ Requires Node 20+ and PostgreSQL.
 ```bash
 cp .env.example .env          # leave META_* blank: OTP codes print to the API console
 npm install
-npm run db:seed               # creates the schema plus 3 sample bakeries (owner phones 0750 000 0001..3)
+npm run db:seed               # creates the schema plus 3 sample Sharya bakeries (owner phones 0750 000 0001..3)
 npm run dev:api               # :4000
 npm run dev:customer          # :5173
 npm run dev:bakery            # :5174
@@ -29,6 +32,7 @@ In dev mode the OTP modal also shows the code. This only happens when Meta crede
 ```bash
 npm test                      # API integration tests against real Postgres (TEST_DATABASE_URL)
 node tools/e2e-smoke.cjs out/ # browser test across both PWAs (needs the 3 dev servers + seeded DB)
+npm run demo                  # builds demo/dist/samouna-preview.html (both apps + in-browser simulated API)
 ```
 
 ## How the rules are enforced

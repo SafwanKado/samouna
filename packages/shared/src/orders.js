@@ -32,7 +32,12 @@ export const ACTIVE_STATUSES = ['pending', 'in_oven', 'ready', 'out_for_delivery
 
 export const CANCEL_WINDOW_MS = 5 * 60 * 1000;
 
-export const CITIES = Object.freeze(['duhok', 'sharya']);
+// Cities the apps currently serve. The database also allows 'duhok' for a later rollout.
+export const CITIES = Object.freeze(['sharya']);
+
+/** Scheduled delivery: at least 20 minutes ahead (the UI offers 30+), at most 7 days. */
+export const SCHEDULE_MIN_LEAD_MS = 20 * 60 * 1000;
+export const SCHEDULE_MAX_AHEAD_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function cancelDeadline(createdAt) {
   return new Date(createdAt).getTime() + CANCEL_WINDOW_MS;

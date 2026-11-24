@@ -4,17 +4,17 @@ import { useI18n } from '@samouna/shared/react';
 import { api, session } from './lib.js';
 
 /**
- * WhatsApp OTP gate. `start(phone, fullName, onSuccess)` sends a code and
- * shows the modal; a correct code creates/logs in the account, stores the
- * session and then calls onSuccess(token).
+ * WhatsApp OTP step shared by Login and Register.
+ * start({ phone, intent, fullName, email, onSuccess }) sends the code and
+ * opens the modal; a correct code stores the session and calls onSuccess.
  */
 export function useOtpLogin() {
   const { lang } = useI18n();
   const [pending, setPending] = useState(null);
 
-  async function start(phone, fullName, onSuccess) {
-    const r = await api.post('/auth/otp/request', { phone, app: 'customer', lang });
-    setPending({ phone: r.phone, fullName, devCode: r.devCode, onSuccess });
+  async function start(opts) {
+    const r = await api.post('/auth/otp/request', { phone: opts.phone, app: 'customer', intent: opts.intent, lang });
+    setPending({ ...opts, phone: r.phone, devCode: r.devCode });
   }
 
   const modal = pending && (
@@ -22,15 +22,16 @@ export function useOtpLogin() {
       phone={pending.phone}
       devCode={pending.devCode}
       onClose={() => setPending(null)}
-      onResend={() => api.post('/auth/otp/request', { phone: pending.phone, app: 'customer', lang })}
+      onResend={() => api.post('/auth/otp/request', { phone: pending.phone, app: 'customer', intent: pending.intent, lang })}
       onVerify={async (code) => {
         const r = await api.post('/auth/otp/verify', {
-          phone: pending.phone, code, app: 'customer', fullName: pending.fullName, lang,
+          phone: pending.phone, code, app: 'customer', intent: pending.intent,
+          fullName: pending.fullName, email: pending.email, lang,
         });
         session.set({ token: r.token, user: r.user });
         const done = pending.onSuccess;
         setPending(null);
-        await done?.(r.token);
+        done?.(r.user);
       }}
     />
   );

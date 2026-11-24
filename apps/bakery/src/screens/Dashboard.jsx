@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { errorMessage } from '@samouna/shared/api';
-import { LanguageSwitcher, OfflineBanner, Switch, Toast } from '@samouna/shared/components';
+import { Icon, LanguageMenu, OfflineBanner, Switch, Toast, useConfirm } from '@samouna/shared/components';
 import { ACTIVE_STATUSES } from '@samouna/shared/orders';
 import { useI18n, useNow, useRealtimeConnection, useStoredState } from '@samouna/shared/react';
 import { unlockAudio, useChime, useWakeLock } from '../chime.js';
 import { api, live, session, wsUrl } from '../lib.js';
+import { whenLabel } from '../when.js';
 
 const ACTION = {
   pending: { label: 'accept', className: 'btn-primary' },
@@ -61,11 +62,11 @@ export default function Dashboard({ auth }) {
               {store.isActive ? t('shopOpen') : t('shopClosed')}
             </div>
           </div>
-          <LanguageSwitcher />
+          <LanguageMenu compact />
         </div>
         <OfflineBanner status={status} />
         {!soundReady && (
-          <button className="sound-banner" onClick={unlockAudio}>🔔 {t('enableSound')}</button>
+          <button className="sound-banner" onClick={unlockAudio}><Icon name="bell" size={20} />{t('enableSound')}</button>
         )}
       </header>
 
@@ -84,11 +85,14 @@ export default function Dashboard({ auth }) {
         {tab === 'shop' && <ShopTab store={store} setStore={setStore} onError={(msg) => setToast(msg)} />}
       </main>
 
-      <nav className="tabbar">
-        {['orders', 'menu', 'shop'].map((k) => (
-          <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>
-            {t(`${k}Tab`)}
-            {k === 'orders' && pendingCount > 0 && <span className="tab-count num">{pendingCount}</span>}
+      <nav className="tabbar" aria-label="Main">
+        {[['orders', 'bag'], ['menu', 'bread'], ['shop', 'store']].map(([k, icon]) => (
+          <button key={k} className={tab === k ? 'active' : ''} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>
+            <span className="tab-icon">
+              <Icon name={icon} size={26} />
+              {k === 'orders' && pendingCount > 0 && <span className="tab-badge num">{pendingCount}</span>}
+            </span>
+            <span>{t(`${k}Tab`)}</span>
           </button>
         ))}
       </nav>
@@ -99,6 +103,7 @@ export default function Dashboard({ auth }) {
 
 function OrdersTab({ orders, dismissed, onDismiss, onUpdate, onError, reload }) {
   const { t } = useI18n();
+  const [ask, dialog] = useConfirm();
   if (!orders) return <div className="spinner" />;
 
   const order = { pending: 0, in_oven: 1, ready: 2, out_for_delivery: 3 };
@@ -107,22 +112,25 @@ function OrdersTab({ orders, dismissed, onDismiss, onUpdate, onError, reload }) 
     .filter((o) => ACTIVE_STATUSES.includes(o.status))
     .sort((a, b) => order[a.status] - order[b.status] || new Date(a.createdAt) - new Date(b.createdAt));
 
-  if (!cancelled.length && !active.length) return <p className="empty big-empty">🍞 {t('noActiveOrders')}</p>;
+  if (!cancelled.length && !active.length) {
+    return <div className="empty big-empty"><Icon name="bread" size={64} stroke={1.6} /><p>{t('noActiveOrders')}</p></div>;
+  }
 
   return (
     <div className="ticket-grid">
+      {dialog}
       {cancelled.map((o) => (
         <Ticket key={o.id} order={o} onDismiss={() => onDismiss(o.id)} />
       ))}
       {active.map((o) => (
-        <Ticket key={o.id} order={o} onUpdate={onUpdate} onError={onError} reload={reload} />
+        <Ticket key={o.id} order={o} ask={ask} onUpdate={onUpdate} onError={onError} reload={reload} />
       ))}
     </div>
   );
 }
 
-function Ticket({ order, onUpdate, onError, onDismiss, reload }) {
-  const { t, money, name } = useI18n();
+function Ticket({ order, ask, onUpdate, onError, onDismiss, reload }) {
+  const { t, money, name, lang } = useI18n();
   const now = useNow(30_000);
   const [busy, setBusy] = useState(false);
   const minutes = Math.max(0, Math.floor((now - new Date(order.createdAt).getTime()) / 60000));
@@ -141,8 +149,9 @@ function Ticket({ order, onUpdate, onError, onDismiss, reload }) {
   }
 
   const advance = () => run(() => api.post(`/bakery/orders/${order.id}/advance`, { from: order.status }));
-  const reject = () => {
-    if (window.confirm(t('rejectConfirm'))) run(() => api.post(`/bakery/orders/${order.id}/reject`));
+  const reject = async () => {
+    const ok = await ask({ icon: 'x', tone: 'danger', title: t('reject'), message: t('rejectConfirm'), confirmLabel: t('reject'), cancelLabel: t('no') });
+    if (ok) run(() => api.post(`/bakery/orders/${order.id}/reject`));
   };
 
   const isCancelled = order.status === 'cancelled';
@@ -153,10 +162,13 @@ function Ticket({ order, onUpdate, onError, onDismiss, reload }) {
         <div className="small muted">{minutes < 1 ? t('justNow') : t('minutesAgo', { n: minutes })}</div>
       </div>
 
-      {order.status === 'pending' && <div className="ticket-flag">🔔 {t('newOrder')}</div>}
+      {order.status === 'pending' && <div className="ticket-flag"><Icon name="bell" size={20} />{t('newOrder')}</div>}
+      {order.scheduledFor && (
+        <div className="ticket-sched"><Icon name="clock" size={18} />{t('scheduledFor', { when: whenLabel(order.scheduledFor, lang, t) })}</div>
+      )}
       {isCancelled && (
         <div className="ticket-flag cancelled">
-          ✖ {order.cancelledBy === 'customer' ? t('cancelledByCustomer') : t('cancelledByBakery')}
+          <Icon name="x" size={20} />{order.cancelledBy === 'customer' ? t('cancelledByCustomer') : t('cancelledByBakery')}
         </div>
       )}
       {!isCancelled && order.status !== 'pending' && (
@@ -170,14 +182,15 @@ function Ticket({ order, onUpdate, onError, onDismiss, reload }) {
           </li>
         ))}
       </ul>
-      {order.notes && <p className="ticket-notes">📝 {order.notes}</p>}
+      {order.notes && <p className="ticket-notes">{order.notes}</p>}
 
       <div className="ticket-customer">
         <div className="grow">
           <strong>{order.customerName}</strong>
-          <div className="small">📍 {order.deliveryAddress}</div>
+          <div className="small muted row"><Icon name="pin" size={16} />{order.deliveryAddress}</div>
+          <div className="small muted num">{order.customerPhone}</div>
         </div>
-        <a className="btn btn-small" href={`tel:${order.customerPhone}`}>📞 {t('call')}</a>
+        <a className="btn btn-small" href={`tel:${order.customerPhone}`}><Icon name="phone" size={18} />{t('call')}</a>
       </div>
 
       <div className="row-between ticket-total">
@@ -193,7 +206,7 @@ function Ticket({ order, onUpdate, onError, onDismiss, reload }) {
             {t(action.label)}
           </button>
           {order.status === 'pending' && (
-            <button className="btn-link danger-link" disabled={busy} onClick={reject}>{t('reject')}</button>
+            <button className="btn-text danger-link" disabled={busy} onClick={reject}>{t('reject')}</button>
           )}
         </div>
       )}

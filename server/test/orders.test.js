@@ -36,7 +36,7 @@ test('full pipeline: order -> bakery sees it live -> advance -> cash logged', as
   assert.equal(order.subtotal, 10 * 250 + 1500);
   assert.equal(order.deliveryFee, 1000);
   assert.equal(order.total, 5000);
-  assert.equal(order.deliveryCity, 'duhok');
+  assert.equal(order.deliveryCity, 'sharya');
 
   const live = await staff.next((m) => m.type === 'order.created');
   assert.equal(live.order.id, order.id);
@@ -170,4 +170,25 @@ test('validates order input', async () => {
     const r = await t.api('POST', '/orders', bad, customer.token);
     assert.ok([400, 409].includes(r.status), JSON.stringify(r.body));
   }
+});
+
+test('scheduled orders: accepted 20 min to 7 days ahead, rejected otherwise', async () => {
+  const at = new Date(Date.now() + 2 * 3600e3).toISOString();
+  const ok = await t.api('POST', '/orders', orderBody({ scheduledFor: at }), customer.token);
+  assert.equal(ok.status, 201);
+  assert.equal(new Date(ok.body.order.scheduledFor).toISOString(), at);
+
+  for (const bad of [new Date(Date.now() + 5 * 60e3), new Date(Date.now() + 8 * 86400e3), 'tomorrow-ish']) {
+    const r = await t.api('POST', '/orders', orderBody({ scheduledFor: bad }), customer.token);
+    assert.equal(r.status, 400);
+    assert.equal(r.body.error.code, 'schedule_invalid');
+  }
+});
+
+test('stores outside the served cities are hidden', async () => {
+  await t.pool.query("UPDATE stores SET city = 'duhok' WHERE store_id = $1", [other.storeId]);
+  const list = await t.api('GET', '/stores');
+  assert.ok(list.body.stores.every((s) => s.city === 'sharya'));
+  assert.equal((await t.api('GET', `/stores/${other.storeId}`)).status, 404);
+  await t.pool.query("UPDATE stores SET city = 'sharya' WHERE store_id = $1", [other.storeId]);
 });

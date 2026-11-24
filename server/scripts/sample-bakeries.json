@@ -3,8 +3,8 @@
     "ownerName": "Sample Owner One",
     "ownerPhone": "0750 000 0001",
     "storeName": "Furn Al-Noor",
-    "address": "Malta, near the main roundabout",
-    "city": "duhok",
+    "address": "Sharya main street, near the roundabout",
+    "city": "sharya",
     "deliveryFee": 1000,
     "isActive": true,
     "products": [
@@ -18,9 +18,9 @@
   {
     "ownerName": "Sample Owner Two",
     "ownerPhone": "0750 000 0002",
-    "storeName": "Duhok Golden Bakery",
-    "address": "Nakhoshkhana Street, opposite the pharmacy",
-    "city": "duhok",
+    "storeName": "Sharya Golden Bakery",
+    "address": "Market street, opposite the pharmacy",
+    "city": "sharya",
     "deliveryFee": 0,
     "isActive": true,
     "products": [
@@ -36,7 +36,7 @@
     "address": "Sharya centre, next to the market",
     "city": "sharya",
     "deliveryFee": 500,
-    "isActive": false,
+    "isActive": true,
     "products": [
       { "ku": "سەموون", "ar": "صمون", "en": "Samoun", "price": 250 },
       { "ku": "نانێ تیری", "ar": "خبز تنور", "en": "Tandoor bread", "price": 500 }

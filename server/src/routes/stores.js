@@ -10,9 +10,9 @@ export function storeRoutes(pool) {
   r.get('/', ah(async (req, res) => {
     const city = CITIES.includes(req.query.city) ? req.query.city : null;
     const { rows } = await pool.query(
-      `SELECT * FROM stores WHERE ($1::text IS NULL OR city = $1)
+      `SELECT * FROM stores WHERE city = ANY($2) AND ($1::text IS NULL OR city = $1)
         ORDER BY is_active DESC, store_name`,
-      [city],
+      [city, CITIES],
     );
     res.json({ stores: rows.map(serializeStore) });
   }));
@@ -20,7 +20,7 @@ export function storeRoutes(pool) {
   r.get('/:id', ah(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw notFound();
-    const store = (await pool.query('SELECT * FROM stores WHERE store_id = $1', [id])).rows[0];
+    const store = (await pool.query('SELECT * FROM stores WHERE store_id = $1 AND city = ANY($2)', [id, CITIES])).rows[0];
     if (!store) throw notFound();
     const { rows } = await pool.query(
       'SELECT * FROM products WHERE store_id = $1 ORDER BY sort_order, product_id',

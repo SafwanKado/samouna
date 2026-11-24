@@ -71,3 +71,36 @@ test('bakery login is limited to registered bakery numbers', async () => {
   const r = await t.api('GET', '/bakery/orders', undefined, asCustomer.token);
   assert.equal(r.status, 401);
 });
+
+test('separate login and register flows for the customer app', async () => {
+  const phone = '0772 555 1212';
+  const login = await t.api('POST', '/auth/otp/request', { phone, app: 'customer', intent: 'login' });
+  assert.equal(login.status, 404);
+  assert.equal(login.body.error.code, 'no_account');
+
+  const reg = await t.api('POST', '/auth/otp/request', { phone, app: 'customer', intent: 'register' });
+  assert.equal(reg.status, 200);
+
+  const badEmail = await t.api('POST', '/auth/otp/verify', {
+    phone, app: 'customer', intent: 'register', code: reg.body.devCode, fullName: 'Rojan Saleh', email: 'not-an-email',
+  });
+  assert.equal(badEmail.body.error.code, 'invalid_email');
+
+  const ok = await t.api('POST', '/auth/otp/verify', {
+    phone, app: 'customer', intent: 'register', code: reg.body.devCode, fullName: 'Rojan Saleh', email: 'Rojan@Example.com',
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.user.email, 'rojan@example.com');
+
+  const again = await t.api('POST', '/auth/otp/request', { phone, app: 'customer', intent: 'register' });
+  assert.equal(again.body.error.code, 'account_exists');
+
+  const relog = await t.api('POST', '/auth/otp/request', { phone, app: 'customer', intent: 'login' });
+  assert.equal(relog.status, 200);
+  const in2 = await t.api('POST', '/auth/otp/verify', { phone, app: 'customer', intent: 'login', code: relog.body.devCode });
+  assert.equal(in2.body.user.fullName, 'Rojan Saleh');
+
+  const upd = await t.api('PATCH', '/auth/me', { fullName: 'Rojan S.', email: '' }, in2.body.token);
+  assert.equal(upd.body.user.fullName, 'Rojan S.');
+  assert.equal(upd.body.user.email, null);
+});

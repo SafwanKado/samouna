@@ -3,6 +3,7 @@ import { requireAuth } from '../auth.js';
 import { withTransaction } from '../db.js';
 import { ah, badRequest, conflict, notFound } from '../errors.js';
 import { publish } from '../events.js';
+import { CITIES, SCHEDULE_MAX_AHEAD_MS, SCHEDULE_MIN_LEAD_MS } from '@samouna/shared/orders';
 import { ORDER_COLUMNS, loadOrder, withItems } from '../serializers.js';
 
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
@@ -26,8 +27,19 @@ function parseOrderBody(body) {
     merged.set(productId, Math.min(99, (merged.get(productId) || 0) + quantity));
   }
 
+  let scheduledFor = null;
+  if (body.scheduledFor) {
+    const at = new Date(body.scheduledFor);
+    const ahead = at.getTime() - Date.now();
+    if (Number.isNaN(ahead) || ahead < SCHEDULE_MIN_LEAD_MS || ahead > SCHEDULE_MAX_AHEAD_MS) {
+      throw badRequest('schedule_invalid', 'scheduledFor must be 20 minutes to 7 days ahead');
+    }
+    scheduledFor = at.toISOString();
+  }
+
   return {
     storeId,
+    scheduledFor,
     deliveryAddress,
     fullName: str(body.fullName, 100),
     notes: str(body.notes, 300) || null,
@@ -55,7 +67,7 @@ export function orderRoutes(pool) {
 
     const orderId = await withTransaction(pool, async (db) => {
       const store = (await db.query('SELECT * FROM stores WHERE store_id = $1 FOR SHARE', [input.storeId])).rows[0];
-      if (!store) throw notFound('Store not found');
+      if (!store || !CITIES.includes(store.city)) throw notFound('Store not found');
       if (!store.is_active) throw conflict('store_closed', 'Store is closed');
 
       // Prices always come from the database, never from the client.
@@ -83,12 +95,13 @@ export function orderRoutes(pool) {
 
       const { rows } = await db.query(
         `INSERT INTO orders (customer_id, store_id, client_request_id, customer_name, customer_phone,
-                             delivery_address, delivery_city, notes, subtotal_amount, delivery_fee, total_amount)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                             delivery_address, delivery_city, notes, subtotal_amount, delivery_fee, total_amount,
+                             scheduled_for)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (customer_id, client_request_id) WHERE client_request_id IS NOT NULL DO NOTHING
          RETURNING order_id`,
         [customerId, store.store_id, input.clientRequestId, customerName, user.phone_number,
-          input.deliveryAddress, store.city, input.notes, subtotal, fee, subtotal + fee],
+          input.deliveryAddress, store.city, input.notes, subtotal, fee, subtotal + fee, input.scheduledFor],
       );
       if (!rows[0]) return null; // lost an idempotency race; the other request created it
       const id = rows[0].order_id;

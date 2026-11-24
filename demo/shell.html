@@ -6,17 +6,17 @@
 <style>
   /* Layout: a workbench — a slim instructions strip, then the two devices side by side (stacked with a switcher on phones). */
   :root {
-    --bg: #f3ece4; --panel: #fffaf4; --ink: #2b1d12; --muted: #76655a; --line: #e2d5c7;
-    --accent: #b85a17; --accent-ink: #ffffff; --device: #2a1b12; --code-bg: #f6e7d6;
+    --bg: #eef1f4; --panel: #ffffff; --ink: #1c232d; --muted: #5d6877; --line: #d9dee5;
+    --accent: #2f8a17; --accent-ink: #ffffff; --device: #111820; --code-bg: #e3f1dc;
     --display: 'Rubik', 'Noto Sans Arabic', system-ui, sans-serif;
     --body: 'Noto Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --bg: #1b1410; --panel: #261c16; --ink: #f3e7db; --muted: #b6a291; --line: #3d2f25;
-    --accent: #e48a45; --accent-ink: #1b1410; --device: #0d0907; --code-bg: #3a2a1e; color-scheme: dark; } }
+    --bg: #151a21; --panel: #1f2630; --ink: #eef1f5; --muted: #9aa5b4; --line: #343e4c;
+    --accent: #5cc93c; --accent-ink: #10150c; --device: #080b0f; --code-bg: #24361d; color-scheme: dark; } }
   :root[data-theme="dark"] {
-    --bg: #1b1410; --panel: #261c16; --ink: #f3e7db; --muted: #b6a291; --line: #3d2f25;
-    --accent: #e48a45; --accent-ink: #1b1410; --device: #0d0907; --code-bg: #3a2a1e; color-scheme: dark; }
+    --bg: #151a21; --panel: #1f2630; --ink: #eef1f5; --muted: #9aa5b4; --line: #343e4c;
+    --accent: #5cc93c; --accent-ink: #10150c; --device: #080b0f; --code-bg: #24361d; color-scheme: dark; }
 
   body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
   .wrap { max-width: 1440px; margin: 0 auto; padding-block: 20px 32px;
@@ -45,7 +45,7 @@
   .device-label b { font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
   .device-label span { color: var(--muted); font-size: 0.9rem; direction: ltr; }
   .bezel { background: var(--device); padding: 10px; border-radius: 34px; box-shadow: 0 18px 40px rgb(0 0 0 / 18%); }
-  .bezel iframe { display: block; border: 0; background: #fbf7f2; border-radius: 24px; width: 100%; height: 100%; }
+  .bezel iframe { display: block; border: 0; background: #222a36; border-radius: 24px; width: 100%; height: 100%; }
   .phone { flex: 0 0 auto; }
   .phone .bezel { width: 400px; height: 800px; max-width: 100%; }
   .tablet { flex: 1 1 auto; }
@@ -66,14 +66,14 @@
   <header>
     <div>
       <h1>Samouna live preview</h1>
-      <p class="lede">The real customer and bakery apps, running side by side. Place an order on the phone and watch it ring on the tablet.</p>
+      <p class="lede">The customer and bakery apps for Sharya, running side by side. Place an order on the phone and watch it ring on the tablet.</p>
     </div>
     <button class="reset" id="reset" type="button">Reset demo</button>
   </header>
 
   <ul class="tips">
-    <li><strong>Customer phone</strong>Use any Iraqi mobile number, for example <code>0751 234 5678</code>.</li>
-    <li><strong>Bakery login</strong>Use <code>0750 000 0001</code> for Furn Al-Noor or <code>0750 000 0002</code> for Duhok Golden.</li>
+    <li><strong>Customer account</strong>Tap <em>Register now</em> and use any Iraqi number, for example <code>0751 234 5678</code>. Or tap <em>Browse the app</em> first.</li>
+    <li><strong>Bakery login</strong>Use <code>0750 000 0001</code> for Furn Al-Noor or <code>0750 000 0002</code> for Sharya Golden Bakery.</li>
     <li><strong>WhatsApp code</strong>No message is sent here. The 6-digit code appears in the yellow box under the input.</li>
     <li><strong>Order sound</strong>Tap anywhere on the tablet once to allow the new-order chime.</li>
   </ul>

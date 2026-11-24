@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { errorMessage } from '@samouna/shared/api';
-import { LanguageSwitcher, OtpModal } from '@samouna/shared/components';
+import { BrandMark, LanguageMenu, OtpModal, PhoneField } from '@samouna/shared/components';
 import { normalizeIraqiMobile } from '@samouna/shared/phone';
 import { useI18n } from '@samouna/shared/react';
 import { api, session } from '../lib.js';
@@ -30,17 +30,14 @@ export default function Login() {
 
   return (
     <div className="login">
-      <div className="login-top"><LanguageSwitcher /></div>
-      <img src="/icons/icon-192.png" alt="" width="88" height="88" className="login-logo" />
-      <h1>{t('bakeryAppName')}</h1>
-      <p className="muted">{t('bakeryLoginHint')}</p>
-      <form className="stack" onSubmit={submit} noValidate>
-        <label className="field">
-          {t('phone')}
-          <input dir="ltr" type="tel" inputMode="tel" autoComplete="tel" placeholder={t('phoneHint')} value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </label>
+      <div className="login-top"><LanguageMenu /></div>
+      <BrandMark src="/icons/logo.png" size={140} ring />
+      <h1 className="login-title">{t('bakeryAppName')}</h1>
+      <p className="muted login-sub">{t('bakeryLoginHint')}</p>
+      <form className="login-card" onSubmit={submit} noValidate>
+        <PhoneField id="bakery-phone" value={phone} onChange={setPhone} />
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn btn-primary btn-big" disabled={busy}>{t('sendCode')}</button>
+        <button className="btn btn-primary btn-big" disabled={busy}>{t('login')}</button>
       </form>
       {pending && (
         <OtpModal

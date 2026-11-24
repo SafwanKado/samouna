@@ -67,7 +67,7 @@ export async function startTestServer() {
   async function seedBakery(overrides = {}) {
     const [r] = await onboard(pool, [{
       ownerName: 'Owner', ownerPhone: '0750 111 0001', storeName: 'Test Bakery', address: 'Malta',
-      city: 'duhok', deliveryFee: 1000, isActive: true,
+      city: 'sharya', deliveryFee: 1000, isActive: true,
       products: [
         { ku: 'سەموون', ar: 'صمون', en: 'Samoun', price: 250 },
         { ku: 'کولێرە', ar: 'كليچة', en: 'Klecha', price: 1500 },

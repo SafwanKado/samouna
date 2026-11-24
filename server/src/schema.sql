@@ -96,6 +96,11 @@ CREATE TABLE IF NOT EXISTS otp_codes (
 );
 CREATE INDEX IF NOT EXISTS otp_codes_phone_idx ON otp_codes(phone_number, created_at DESC);
 
+-- Additive columns (safe on existing databases).
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS email TEXT CHECK (email IS NULL OR length(email) <= 254);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE orders   ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ;
+
 -- Every order that reaches `completed` is logged to `transactions` automatically,
 -- in the same database transaction, whichever code path completed it.
 CREATE OR REPLACE FUNCTION log_completed_order() RETURNS trigger AS $$
